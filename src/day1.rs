@@ -26,6 +26,33 @@ mod tests {
 
         assert_eq!(elf_with_most.calories, 24000);
     }
+
+    #[test]
+    fn get_top_elves_should_return_the_top_n_elves_that_have_the_most_calories() {
+        let input = "1000
+2000
+3000
+
+4000
+
+5000
+6000
+
+7000
+8000
+9000
+
+10000
+
+";
+
+        let top_elves: Vec<Elf> = get_top_elves(&input, 3);
+
+        assert_eq!(top_elves.len(), 3);
+        assert_eq!(top_elves.get(0).unwrap().calories, 24000);
+        assert_eq!(top_elves.get(1).unwrap().calories, 11000);
+        assert_eq!(top_elves.get(2).unwrap().calories, 10000);
+    }
 }
 
 use std::env;
@@ -36,9 +63,29 @@ pub mod part1 {
     pub fn solution() {
         let filename = env::current_dir().unwrap().join("src/data/day1.txt");
         let input = std::fs::read_to_string(filename).unwrap();
+
         let elf_with_most = get_most_calories(&input).unwrap();
 
         println!("{elf_with_most:#?}");
+    }
+}
+
+pub mod part2 {
+    use super::*;
+
+    pub fn solution() {
+        let filename = env::current_dir().unwrap().join("src/data/day1.txt");
+        let input = std::fs::read_to_string(filename).unwrap();
+
+        let top_elves = get_top_elves(&input, 3);
+        let total_calories = top_elves
+            .iter()
+            .map(|elf| elf.calories)
+            .reduce(|sum, calories| sum + calories)
+            .unwrap();
+
+        println!("{top_elves:#?}");
+        println!("total calories = {}", total_calories);
     }
 }
 
@@ -98,4 +145,38 @@ pub fn get_most_calories(calorie_list: &str) -> Option<Elf> {
     }
 
     elf_with_most
+}
+
+pub fn get_top_elves(calorie_list: &str, top_n: usize) -> Vec<Elf> {
+    let mut elves = Vec::<Elf>::new();
+
+    let index_of_smaller_elf = |elves: &Vec<Elf>, calories| {
+        for (i, elf) in elves.iter().enumerate() {
+            if calories > elf.calories {
+                return i;
+            }
+        }
+        elves.len()
+    };
+
+    let mut remaining_calorie_list = calorie_list;
+
+    loop {
+        let (current_elf, calorie_list) = Elf::from(remaining_calorie_list);
+        remaining_calorie_list = calorie_list;
+
+        let insert_index = index_of_smaller_elf(&elves, current_elf.calories);
+        if insert_index < top_n {
+            elves.insert(insert_index, current_elf);
+            if elves.len() > top_n {
+                elves.pop();
+            }
+        }
+
+        if calorie_list.len() == 0 {
+            break;
+        }
+    }
+
+    elves
 }
