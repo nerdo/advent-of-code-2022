@@ -4,7 +4,7 @@ mod tests {
     use super::*;
 
     #[test]
-    fn it_should_return_the_largest_sum_of_calories() {
+    fn get_most_calories_should_return_the_largest_sum_of_calories() {
         let input = "1000
 2000
 3000
