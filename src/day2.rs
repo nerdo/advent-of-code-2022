@@ -98,6 +98,10 @@ pub fn calculated_rock_paper_scissors_tournament_score(input: &str) -> u32 {
     let mut total_score = 0;
 
     for line in input.lines() {
+        if line.is_empty() {
+            continue;
+        }
+
         let round = Round::try_from(line).unwrap();
         total_score += round.my_score;
     }
