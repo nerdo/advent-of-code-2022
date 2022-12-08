@@ -3,15 +3,28 @@ mod tests {
     use super::*;
 
     #[test]
-    fn calculated_rock_paper_scissors_tournament_score_returns_the_correct_score() {
+    fn calculated_rock_paper_scissors_tournament_score_with_my_strategy_returns_the_correct_score() {
         let input = "A Y
 B X
 C Z
 
 ";
-        let total_score = calculated_rock_paper_scissors_tournament_score(&input);
+        let total_score = calculated_rock_paper_scissors_tournament_score_with_my_strategy(&input);
 
         assert_eq!(total_score, 15);
+    }
+
+    #[test]
+    fn calculated_rock_paper_scissors_tournament_score_with_elf_strategy_returns_the_correct_score()
+    {
+        let input = "A Y
+B X
+C Z
+
+";
+        let total_score = calculated_rock_paper_scissors_tournament_score_with_elf_strategy(&input);
+
+        assert_eq!(total_score, 12);
     }
 }
 
@@ -23,7 +36,7 @@ pub mod part1 {
         let filename = current_dir().unwrap().join("src/data/day2.txt");
         let input = read_to_string(filename).unwrap();
 
-        let total_score = calculated_rock_paper_scissors_tournament_score(&input);
+        let total_score = calculated_rock_paper_scissors_tournament_score_with_my_strategy(&input);
 
         println!("Total Score = {}", total_score);
     }
@@ -106,6 +119,20 @@ impl Shape {
             Shape::Scissors => 3,
         }
     }
+
+pub fn calculated_rock_paper_scissors_tournament_score_with_my_strategy(input: &str) -> u32 {
+    let mut total_score = 0;
+
+    for line in input.lines() {
+        if line.is_empty() {
+            continue;
+        }
+
+        let round = Round::try_from(line).unwrap();
+        total_score += round.my_score_my_strategy;
+    }
+
+    total_score
 }
 
 pub fn calculated_rock_paper_scissors_tournament_score(input: &str) -> u32 {
