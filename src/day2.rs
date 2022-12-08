@@ -9,7 +9,7 @@ B X
 C Z
 
 ";
-        let total_score = calculated_rock_paper_scissors_tournament_score_with_my_strategy(&input);
+        let total_score = calculated_rock_paper_scissors_tournament_score_with_my_strategy(input);
 
         assert_eq!(total_score, 15);
     }
@@ -22,7 +22,7 @@ B X
 C Z
 
 ";
-        let total_score = calculated_rock_paper_scissors_tournament_score_with_elf_strategy(&input);
+        let total_score = calculated_rock_paper_scissors_tournament_score_with_elf_strategy(input);
 
         assert_eq!(total_score, 12);
     }

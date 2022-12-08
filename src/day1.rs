@@ -22,7 +22,7 @@ mod tests {
 
 ";
 
-        let elf_with_most = get_most_calories(&input).unwrap();
+        let elf_with_most = get_most_calories(input).unwrap();
 
         assert_eq!(elf_with_most.calories, 24000);
     }
@@ -46,7 +46,7 @@ mod tests {
 
 ";
 
-        let top_elves: Vec<Elf> = get_top_elves(&input, 3);
+        let top_elves: Vec<Elf> = get_top_elves(input, 3);
 
         assert_eq!(top_elves.len(), 3);
         assert_eq!(top_elves.get(0).unwrap().calories, 24000);
@@ -89,7 +89,7 @@ pub mod part2 {
     }
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, Eq, PartialEq)]
 pub struct Elf {
     pub calories: i32,
 }
@@ -139,7 +139,7 @@ pub fn get_most_calories(calorie_list: &str) -> Option<Elf> {
             Some(_) => elf_with_most,
         };
 
-        if calorie_list.len() == 0 {
+        if calorie_list.is_empty() {
             break;
         }
     }
@@ -173,7 +173,7 @@ pub fn get_top_elves(calorie_list: &str, top_n: usize) -> Vec<Elf> {
             }
         }
 
-        if calorie_list.len() == 0 {
+        if calorie_list.is_empty() {
             break;
         }
     }
