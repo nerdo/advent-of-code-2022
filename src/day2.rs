@@ -24,8 +24,8 @@ enum Shape {
 
 #[derive(Debug)]
 struct Round {
-    my_shape: Shape,
-    their_shape: Shape,
+    _my_shape: Shape,
+    _their_shape: Shape,
     my_score: u32,
 }
 
@@ -44,8 +44,8 @@ impl TryFrom<&str> for Round {
         let my_score = my_shape.point_value() + my_shape.score_against(&their_shape);
 
         Ok(Round {
-            my_shape,
-            their_shape,
+            _my_shape: my_shape,
+            _their_shape: their_shape,
             my_score,
         })
     }
