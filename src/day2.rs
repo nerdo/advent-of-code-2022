@@ -15,6 +15,20 @@ C Z
     }
 }
 
+pub mod part1 {
+    use super::*;
+    use std::{env::current_dir, fs::read_to_string};
+
+    pub fn solution() {
+        let filename = current_dir().unwrap().join("src/data/day2.txt");
+        let input = read_to_string(filename).unwrap();
+
+        let total_score = calculated_rock_paper_scissors_tournament_score(&input);
+
+        println!("Total Score = {}", total_score);
+    }
+}
+
 #[derive(Debug)]
 enum Shape {
     Rock = 1,
