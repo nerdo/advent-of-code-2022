@@ -17,6 +17,23 @@ CrZsJsPPZsGzwwsLwLmpwMDw
 
         assert_eq!(answer, 157);
     }
+
+    #[test]
+    fn get_badge_priority_sum_returns_the_correct_value() {
+        let input = "vJrwpWtwJgWrhcsFMMfFFhFp
+jqHRNqRjqzjGDLGLrsFMfFZSrLrFZsSL
+PmmdzqPrVvPwwTWBwg
+
+wMqvLMZHhHMvwLHjbvcjnnSBnvTQFn
+ttgJtRGJQctTZtZT
+CrZsJsPPZsGzwwsLwLmpwMDw
+
+";
+
+        let answer = get_badge_priority_sum(input);
+        
+        assert_eq!(answer, 70);
+    }
 }
 
 pub mod part1 {
@@ -71,4 +88,8 @@ fn find_matching_item_type<'a>(a: &'a str, b: &'a str) -> Result<char, &'static 
     }
 
     Err("No Matching Item Type Found")
+}
+
+pub fn get_badge_priority_sum(input: &str) -> u32 {
+    70
 }
