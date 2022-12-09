@@ -19,6 +19,20 @@ CrZsJsPPZsGzwwsLwLmpwMDw
     }
 }
 
+pub mod part1 {
+    use super::*;
+    use std::{env::current_dir, fs::read_to_string};
+
+    pub fn solution() {
+        let filename = current_dir().unwrap().join("src/data/day3.txt");
+        let input = read_to_string(filename).unwrap();
+
+        let misplaced_item_priority_sum = get_misplaced_item_priority_sum(&input);
+
+        println!("misplaced_item_priority_sum = {misplaced_item_priority_sum:#?}");
+    }
+}
+
 pub fn get_misplaced_item_priority_sum(input: &str) -> u32 {
     let mut misplaced_item_priority_sum: u32 = 0;
 
