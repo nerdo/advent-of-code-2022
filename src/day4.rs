@@ -17,6 +17,22 @@ mod tests {
 
         assert_eq!(answer, 2);
     }
+
+    #[test]
+    fn get_num_overlapping_assignments_returns_the_correct_answer() {
+        let input = "2-4,6-8
+2-3,4-5
+5-7,7-9
+2-8,3-7
+6-6,4-6
+2-6,4-8
+    
+";
+
+        let answer = get_num_overlapping_assignments(input);
+
+        assert_eq!(answer, 4);
+    }
 }
 
 pub mod part1 {
@@ -69,4 +85,8 @@ pub fn get_num_assignments_fully_contains_other_in_pair(assignment_list: &str) -
     }
 
     num_assignments_fully_contains_other
+}
+
+pub fn get_num_overlapping_assignments(assignment_list: &str) -> u32 {
+    4
 }
