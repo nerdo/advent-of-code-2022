@@ -19,6 +19,20 @@ mod tests {
     }
 }
 
+pub mod part1 {
+    use super::*;
+    use std::{env::current_dir, fs::read_to_string};
+
+    pub fn solution() {
+        let filename = current_dir().unwrap().join("src/data/day4.txt");
+        let input = read_to_string(filename).unwrap();
+
+        let answer = get_num_assignments_fully_contains_other_in_pair(&input);
+
+        println!("part 1 answer = {answer:#?}");
+    }
+}
+
 pub fn get_num_assignments_fully_contains_other_in_pair(assignment_list: &str) -> u32 {
     let mut num_assignments_fully_contains_other = 0;
 
@@ -45,7 +59,6 @@ pub fn get_num_assignments_fully_contains_other_in_pair(assignment_list: &str) -
             };
             let Ok(b) = parse_range(parts.get(1).unwrap()) else {
                 continue;
-
             };
             (a, b)
         };
