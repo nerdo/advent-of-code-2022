@@ -49,6 +49,20 @@ pub mod part1 {
     }
 }
 
+pub mod part2 {
+    use super::*;
+    use std::{env::current_dir, fs::read_to_string};
+
+    pub fn solution() {
+        let filename = current_dir().unwrap().join("src/data/day4.txt");
+        let input = read_to_string(filename).unwrap();
+
+        let answer = get_num_overlapping_assignments(&input);
+
+        println!("part 2 answer = {answer:#?}");
+    }
+}
+
 pub fn get_num_assignments_fully_contains_other_in_pair(assignment_list: &str) -> u32 {
     let mut num_assignments_fully_contains_other = 0;
 
@@ -88,5 +102,42 @@ pub fn get_num_assignments_fully_contains_other_in_pair(assignment_list: &str) -
 }
 
 pub fn get_num_overlapping_assignments(assignment_list: &str) -> u32 {
-    4
+    let mut num_overlapping_assignments = 0;
+
+    let is_in_range = |n, range: (u32, u32)| n >= range.0 && n <= range.1;
+    let range_overlaps = |a: (u32, u32), b: (u32, u32)| {
+        is_in_range(a.0, b) || is_in_range(a.1, b) || is_in_range(b.0, a) || is_in_range(b.1, a)
+    };
+    let parse_range = |input: &str| {
+        let parts: Vec<&str> = input.split('-').collect();
+        if parts.len() != 2 {
+            return Err("Invalid Range");
+        }
+
+        let start = parts.first().unwrap().parse::<u32>().unwrap();
+        let end = parts.get(1).unwrap().parse::<u32>().unwrap();
+        Ok((start, end))
+    };
+
+    for assignment_line in assignment_list.lines() {
+        let (range_a, range_b) = {
+            let parts: Vec<&str> = assignment_line.split(',').collect();
+            if parts.len() != 2 {
+                continue;
+            }
+            let Ok(a) = parse_range(parts.first().unwrap()) else {
+                continue;
+            };
+            let Ok(b) = parse_range(parts.get(1).unwrap()) else {
+                continue;
+            };
+            (a, b)
+        };
+
+        if range_overlaps(range_a, range_b) {
+            num_overlapping_assignments += 1;
+        }
+    }
+
+    num_overlapping_assignments
 }
