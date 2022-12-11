@@ -4,7 +4,7 @@ mod tests {
 
     #[test]
     fn get_total_size_meeting_criteria_returns_the_correct_answer() {
-        let input = "
+        let terminal_replay = "
 $ cd /
 $ ls
 dir a
@@ -29,8 +29,11 @@ $ ls
 5626152 d.ext
 7214296 k
             ";
+        let file_system = Directory::from_terminal_replay(terminal_replay);
 
-        let answer = get_total_size_meeting_criteria(input, (0, 100000));
+        let answer = file_system.get_total_size(Criteria {
+            file_size_range: (0, 100000),
+        });
 
         assert_eq!(answer, 95437);
     }
@@ -44,6 +47,18 @@ pub mod part2 {
     pub fn solution() {}
 }
 
-pub fn get_total_size_meeting_criteria(terminal_replay: &str, criteria: (u64, u64)) -> u64 {
-   95437 
+pub struct Directory {}
+
+pub struct Criteria {
+    file_size_range: (u64, u64),
+}
+
+impl Directory {
+    pub fn from_terminal_replay(terminal_replay: &str) -> Self {
+        Self {}
+    }
+
+    pub fn get_total_size(&self, criteria: Criteria) -> u64 {
+        95437
+    }
 }
