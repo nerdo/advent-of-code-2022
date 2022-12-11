@@ -16,9 +16,38 @@ move 2 from 2 to 1
 move 1 from 1 to 2
 
 ";
-        let answer = get_message_from_rearranged_crates(input);
+        let answer = get_message_from_rearranged_crates(
+            input,
+            &Settings {
+                move_multiple_crates_at_once: false,
+            },
+        );
 
         assert_eq!(answer, "CMZ");
+    }
+
+    #[test]
+    fn get_message_from_rearranged_crates_moving_multiple_crates_at_once_returns_the_correct_answer() {
+        let input = "
+    [D]    
+[N] [C]    
+[Z] [M] [P]
+ 1   2   3 
+
+move 1 from 2 to 1
+move 3 from 1 to 3
+move 2 from 2 to 1
+move 1 from 1 to 2
+
+";
+        let answer = get_message_from_rearranged_crates(
+            input,
+            &Settings {
+                move_multiple_crates_at_once: true,
+            },
+        );
+
+        assert_eq!(answer, "MCD");
     }
 }
 
@@ -30,10 +59,38 @@ pub mod part1 {
         let filename = current_dir().unwrap().join("src/data/day5.txt");
         let input = read_to_string(filename).unwrap();
 
-        let answer = get_message_from_rearranged_crates(&input);
+        let answer = get_message_from_rearranged_crates(
+            &input,
+            &Settings {
+                move_multiple_crates_at_once: false,
+            },
+        );
 
         println!("day 5 part 1 message = {answer:?}");
     }
+}
+
+pub mod part2 {
+    use super::*;
+    use std::{env::current_dir, fs::read_to_string};
+
+    pub fn solution() {
+        let filename = current_dir().unwrap().join("src/data/day5.txt");
+        let input = read_to_string(filename).unwrap();
+
+        let answer = get_message_from_rearranged_crates(
+            &input,
+            &Settings {
+                move_multiple_crates_at_once: true,
+            },
+        );
+
+        println!("day 5 part 2 message = {answer:?}");
+    }
+}
+
+pub struct Settings {
+    move_multiple_crates_at_once: bool,
 }
 
 #[derive(Debug)]
@@ -52,7 +109,8 @@ pub enum Instruction {
 
 impl Crates {
     pub fn get_message(&self) -> String {
-        self.stacks.iter()
+        self.stacks
+            .iter()
             .map(|s| s.last().unwrap())
             .fold(String::new(), |mut message, s| {
                 message.push_str(s);
@@ -60,7 +118,7 @@ impl Crates {
             })
     }
 
-    pub fn rearrange(&mut self, instructions: &[Instruction]) {
+    pub fn rearrange(&mut self, instructions: &[Instruction], settings: &Settings) {
         for instruction in instructions {
             match instruction {
                 Instruction::Move {
@@ -73,7 +131,9 @@ impl Crates {
                     let mut payload = source
                         .splice(source.len() - *quantity..source.len(), [])
                         .collect::<Vec<String>>();
-                    payload.reverse();
+                    if !settings.move_multiple_crates_at_once {
+                        payload.reverse();
+                    }
 
                     let destination = self.stacks.get_mut(*to_stack).unwrap();
                     destination.append(&mut payload);
@@ -154,11 +214,14 @@ pub fn parse_initial_state_and_instructions(
     (crates, instructions)
 }
 
-pub fn get_message_from_rearranged_crates(initial_state_and_instructions: &str) -> String {
+pub fn get_message_from_rearranged_crates(
+    initial_state_and_instructions: &str,
+    settings: &Settings,
+) -> String {
     let (mut crates, instructions) =
         parse_initial_state_and_instructions(initial_state_and_instructions);
 
-    crates.rearrange(&instructions);
+    crates.rearrange(&instructions, settings);
 
     crates.get_message()
 }
