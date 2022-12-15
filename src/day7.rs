@@ -59,13 +59,13 @@ pub mod part2 {
 }
 
 /// A filesystem.
-pub struct FileSystem<'a> {
+pub struct FileSystem<'i> {
     /// Directories owned by the filesystem.
-    directories: Vec<Directory<'a>>,
+    directory_index: HashMap<String, Directory<'i>>,
 }
 
 /// A directory.
-pub struct Directory<'a> {
+pub struct Directory<'d> {
     /// The name of the directory.
     name: String,
 
@@ -76,7 +76,7 @@ pub struct Directory<'a> {
     files: HashMap<String, File>,
 
     /// List of sub directories keyed by the directory name.
-    sub_directories: HashMap<String, &'a Directory<'a>>,
+    sub_directories: HashMap<String, &'d Directory<'d>>,
 }
 
 /// A file.
@@ -156,7 +156,7 @@ pub enum TerminalParseErrorKind {
     InvalidFileName,
 }
 
-impl FileSystem<'_> {
+impl<'f> FileSystem<'f> {
     /// Parses terminal replay output into a `FileSystem::Directory` variant containing the file
     /// system structure.
     pub fn from_terminal_replay(terminal_replay: &str) -> Result<Self, Error> {
@@ -171,25 +171,21 @@ impl FileSystem<'_> {
             sub_directories: HashMap::new(),
         };
 
-        let mut file_system = FileSystem {
-            directories: vec![root],
-        };
+        let mut directory_index = HashMap::new();
+        directory_index.insert("/".to_string(), root);
+        let mut file_system = FileSystem { directory_index };
 
-        file_system.fill_from_replay(terminal_events, vec![]);
+        file_system.fill_from_replay(terminal_events);
 
         Ok(file_system)
     }
 
     /// Processes terminal events into the file system entry.
-    fn fill_from_replay<I>(
-        &mut self,
-        mut terminal_events_iter: Peekable<I>,
-        mut stack: Vec<&mut Directory>,
-    ) -> Result<(), ()>
+    fn fill_from_replay<'a, I>(&'a mut self, mut terminal_events_iter: Peekable<I>) -> Result<(), ()>
     where
         I: Iterator<Item = TerminalEvent>,
     {
-        let mut current_directory = stack.last().ok_or(())?;
+        let mut stack: Vec<&Directory> = vec![];
 
         loop {
             let event = match terminal_events_iter.peek() {
@@ -201,15 +197,14 @@ impl FileSystem<'_> {
                 TerminalEvent::ChangeDirectory(target_directory) => {
                     if target_directory == "/" {
                         stack.splice(1.., vec![]);
-                        current_directory = stack.first().ok_or(())?;
                     } else if target_directory == ".." {
                         if stack.len() == 1 {
                             return Err(());
                         }
 
                         stack.pop();
-                        current_directory = stack.last().ok_or(())?;
                     } else {
+                        let current_directory = stack.last().ok_or(())?;
                         let directory =
                             match current_directory.sub_directories.get(target_directory) {
                                 None => {
@@ -219,13 +214,16 @@ impl FileSystem<'_> {
                                         files: HashMap::new(),
                                         sub_directories: HashMap::new(),
                                     };
-                                    // self.directories.insert()
-                                    current_directory.sub_directories.insert(target_directory.to_string(), dir);
-                                    current_directory.sub_directories.get(target_directory).unwrap()
-                                    
-                                },
+                                    let directory_key = Self::get_directory_key(&stack, &dir.name);
+                                    self.index_directory(directory_key.to_string(), dir);
+                                    current_directory
+                                        .sub_directories
+                                        .get(target_directory)
+                                        .unwrap()
+                                }
                                 Some(directory) => directory,
                             };
+                        stack.push(directory);
                     }
                 }
                 TerminalEvent::ListDirectoryContents => {
@@ -238,8 +236,28 @@ impl FileSystem<'_> {
         Ok(())
     }
 
+    /// Gets the directory key for the current representation of the stack.
+    fn get_directory_key(stack: &[&Directory], sub_directory_name: &str) -> String {
+        let parent_path =
+            stack
+                .iter()
+                .map(|dir| dir.name.as_ref())
+                .fold(String::new(), |mut result, current| {
+                    result.push_str(current);
+                    result.push('/');
+                    result
+                });
+        format!("{}{}", parent_path, sub_directory_name)
+    }
+
+    /// Moves the directory into the filesystem's directory index and returns its key.
+    fn index_directory<'a, 'd: 'f>(&'a mut self, directory_key: String, directory: Directory<'d>) {
+        self.directory_index
+            .insert(directory_key, directory);
+    }
+
     /// Gets total size of file system entry
-    pub fn get_total_size(&self, criteria: Criteria) -> u64 {
+    pub fn get_total_size(&self, _criteria: Criteria) -> u64 {
         95437
     }
 
