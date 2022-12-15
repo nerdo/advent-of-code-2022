@@ -1,7 +1,7 @@
 #![warn(missing_docs)]
 //! Advent of Code 2022 Day 7 Solution
 
-use std::{collections::HashMap, iter::Peekable};
+use std::{rc::Rc, cell::RefCell, collections::HashMap};
 
 #[cfg(test)]
 mod tests {
@@ -59,27 +59,30 @@ pub mod part2 {
 }
 
 /// A filesystem.
+#[derive(Debug)]
 pub struct FileSystem<'i> {
     /// Directories owned by the filesystem.
-    directory_index: HashMap<String, Directory<'i>>,
+    directory_index: Rc<RefCell<HashMap<String, Directory<'i>>>>,
 }
 
 /// A directory.
+#[derive(Debug)]
 pub struct Directory<'d> {
     /// The name of the directory.
     name: String,
 
     /// The size of the directory and its contents.
-    size: usize,
+    size: RefCell<usize>,
 
     /// List of files keyed by the file name.
-    files: HashMap<String, File>,
+    files: RefCell<HashMap<String, File>>,
 
     /// List of sub directories keyed by the directory name.
     sub_directories: HashMap<String, &'d Directory<'d>>,
 }
 
 /// A file.
+#[derive(Debug)]
 pub struct File {
     /// The name of the file.
     name: String,
@@ -112,6 +115,7 @@ pub enum TerminalEvent {
 }
 
 /// Criteria for [`get_total_size`]: #method.get_total_size
+#[derive(Debug)]
 pub struct Criteria {
     /// The size range to constrain [`get_total_size`]: #method.get_total_size to.
     size_range: (u64, u64),
@@ -160,38 +164,39 @@ impl<'f> FileSystem<'f> {
     /// Parses terminal replay output into a `FileSystem::Directory` variant containing the file
     /// system structure.
     pub fn from_terminal_replay(terminal_replay: &str) -> Result<Self, Error> {
-        let terminal_events = Self::parsed_terminal_events(terminal_replay)?
-            .into_iter()
-            .peekable();
+        let terminal_events = Self::parsed_terminal_events(terminal_replay)?;
+
+        println!("{terminal_events:#?}");
 
         let root = Directory {
             name: "/".to_string(),
-            size: 0,
-            files: HashMap::new(),
+            size: RefCell::new(0),
+            files: RefCell::new(HashMap::new()),
             sub_directories: HashMap::new(),
         };
 
         let mut directory_index = HashMap::new();
         directory_index.insert("/".to_string(), root);
-        let mut file_system = FileSystem { directory_index };
+        let mut file_system = FileSystem { directory_index: Rc::new(RefCell::new(directory_index)) };
 
-        file_system.fill_from_replay(terminal_events);
+        file_system.fill_from_replay(terminal_events.into_iter()).unwrap();
 
         Ok(file_system)
     }
 
     /// Processes terminal events into the file system entry.
-    fn fill_from_replay<'a, I>(&'a mut self, mut terminal_events_iter: Peekable<I>) -> Result<(), ()>
+    fn fill_from_replay<I>(&mut self, mut terminal_events_iter: I) -> Result<(), &'static str>
     where
         I: Iterator<Item = TerminalEvent>,
     {
         let mut stack: Vec<&Directory> = vec![];
+        let directory_index_rc = self.directory_index.clone();
+        let mut directory_index = directory_index_rc.borrow_mut();
+        let root_dir = directory_index.get_mut("/").unwrap();
+        stack.push(root_dir);
 
-        loop {
-            let event = match terminal_events_iter.peek() {
-                None => break,
-                Some(event) => event,
-            };
+        while let Some(event) = terminal_events_iter.next() {
+            println!("{:#?}", event);
 
             match event {
                 TerminalEvent::ChangeDirectory(target_directory) => {
@@ -199,26 +204,26 @@ impl<'f> FileSystem<'f> {
                         stack.splice(1.., vec![]);
                     } else if target_directory == ".." {
                         if stack.len() == 1 {
-                            return Err(());
+                            return Err("stack is empty and tried to cd ..");
                         }
 
                         stack.pop();
                     } else {
-                        let current_directory = stack.last().ok_or(())?;
+                        let current_directory = stack.last().ok_or("Stack is empty 1")?;
                         let directory =
-                            match current_directory.sub_directories.get(target_directory) {
+                            match current_directory.sub_directories.get(&target_directory) {
                                 None => {
                                     let dir = Directory {
                                         name: target_directory.to_string(),
-                                        size: 0,
-                                        files: HashMap::new(),
+                                        size: RefCell::new(0),
+                                        files: RefCell::new(HashMap::new()),
                                         sub_directories: HashMap::new(),
                                     };
                                     let directory_key = Self::get_directory_key(&stack, &dir.name);
                                     self.index_directory(directory_key.to_string(), dir);
                                     current_directory
                                         .sub_directories
-                                        .get(target_directory)
+                                        .get(&target_directory)
                                         .unwrap()
                                 }
                                 Some(directory) => directory,
@@ -229,7 +234,27 @@ impl<'f> FileSystem<'f> {
                 TerminalEvent::ListDirectoryContents => {
                     terminal_events_iter.next();
                 }
-                TerminalEvent::Listing(_) => todo!(),
+                TerminalEvent::Listing(FileSystemListing::File(name, size)) => {
+                    let current_directory = stack.last().ok_or("Stack is empty 2")?;
+                    *current_directory.size.borrow_mut() += size;
+                    current_directory.files.borrow_mut().insert(
+                        name.clone(),
+                        File {
+                            name: name.clone(),
+                            size,
+                        },
+                    );
+                }
+                TerminalEvent::Listing(FileSystemListing::Directory(name)) => {
+                    let dir = Directory {
+                        name: name.clone(),
+                        size: RefCell::new(0),
+                        files: RefCell::new(HashMap::new()),
+                        sub_directories: HashMap::new(),
+                    };
+                    let directory_key = Self::get_directory_key(&stack, &name);
+                    self.index_directory(directory_key, dir);
+                }
             }
         }
 
@@ -250,14 +275,14 @@ impl<'f> FileSystem<'f> {
         format!("{}{}", parent_path, sub_directory_name)
     }
 
-    /// Moves the directory into the filesystem's directory index and returns its key.
+    /// Moves the directory into the filesystem's directory index.
     fn index_directory<'a, 'd: 'f>(&'a mut self, directory_key: String, directory: Directory<'d>) {
-        self.directory_index
-            .insert(directory_key, directory);
+        self.directory_index.clone().borrow_mut().insert(directory_key, directory);
     }
 
     /// Gets total size of file system entry
     pub fn get_total_size(&self, _criteria: Criteria) -> u64 {
+        println!("{:#?}", self.directory_index.clone().borrow().get("/").unwrap());
         95437
     }
 
