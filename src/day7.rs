@@ -74,6 +74,9 @@ pub struct Directory {
     /// The sum of the size of the files in this Directory.
     local_size: RefCell<usize>,
 
+    /// The sum of the size of the files in this directory and any sub directories.
+    size: RefCell<usize>,
+
     /// List of files keyed by the file name.
     files: RefCell<HashMap<String, RefCell<File>>>,
 
@@ -119,7 +122,7 @@ pub enum TerminalEvent {
 #[derive(Debug)]
 pub struct Criteria {
     /// The size range to constrain [`get_total_size`]: #method.get_total_size to.
-    size_range: (u64, u64),
+    size_range: (usize, usize),
 }
 
 /// An error in the program.
@@ -167,12 +170,10 @@ impl FileSystem {
     pub fn from_terminal_replay(terminal_replay: &str) -> Result<Self, Error> {
         let terminal_events = Self::parsed_terminal_events(terminal_replay)?;
 
-        // println!("{terminal_events:#?}");
-        // println!("--------------------");
-
         let root = Directory {
             name: "/".to_string(),
             local_size: RefCell::new(0),
+            size: RefCell::new(0),
             files: RefCell::new(HashMap::new()),
             sub_directory_keys: HashMap::new(),
         };
@@ -198,6 +199,7 @@ impl FileSystem {
             None => Some(Directory {
                 name: target_directory.to_string(),
                 local_size: RefCell::new(0),
+                size: RefCell::new(0),
                 files: RefCell::new(HashMap::new()),
                 sub_directory_keys: HashMap::new(),
             }),
@@ -211,12 +213,6 @@ impl FileSystem {
         let root_path = "/".to_string();
 
         for event in terminal_events.iter() {
-            // println!("{:#?}", event);
-            {
-                let current_path = stack.last().unwrap_or(&root_path);
-                println!("{current_path}");
-            }
-
             match event {
                 TerminalEvent::ChangeDirectory(target_directory) => {
                     if target_directory == "/" {
@@ -231,7 +227,6 @@ impl FileSystem {
                                 .borrow_mut()
                                 .insert(directory_key.to_string(), RefCell::new(new_dir));
                         }
-                        println!("directory_key = {directory_key}");
                         stack.push(directory_key.to_string());
                     }
                 }
@@ -239,17 +234,23 @@ impl FileSystem {
                     continue;
                 }
                 TerminalEvent::Listing(FileSystemListing::File(name, size)) => {
-                    let di = self.directory_index.borrow();
-                    let current_path = stack.last().unwrap_or(&root_path);
-                    let current_directory = di.get(current_path.as_str()).unwrap().borrow();
-                    *current_directory.local_size.borrow_mut() += size;
-                    current_directory.files.borrow_mut().insert(
-                        name.clone(),
-                        RefCell::new(File {
-                            name: name.clone(),
-                            size: *size,
-                        }),
-                    );
+                    // Adjust the sizes of all the directories leading up to this file
+                    let last_index = stack.len() - 1;
+                    for (index, current_path) in stack.iter().enumerate() {
+                        let di = self.directory_index.borrow();
+                        let current_directory = di.get(current_path.as_str()).unwrap().borrow();
+                        if index == last_index {
+                            *current_directory.local_size.borrow_mut() += size;
+                        }
+                        *current_directory.size.borrow_mut() += size;
+                        current_directory.files.borrow_mut().insert(
+                            name.clone(),
+                            RefCell::new(File {
+                                name: name.clone(),
+                                size: *size,
+                            }),
+                        );
+                    }
                 }
                 TerminalEvent::Listing(FileSystemListing::Directory(name)) => {
                     let current_path = stack.last().unwrap_or(&root_path);
@@ -257,6 +258,7 @@ impl FileSystem {
                     let new_dir = Directory {
                         name: name.clone(),
                         local_size: RefCell::new(0),
+                        size: RefCell::new(0),
                         files: RefCell::new(HashMap::new()),
                         sub_directory_keys: HashMap::new(),
                     };
@@ -280,9 +282,17 @@ impl FileSystem {
     }
 
     /// Gets total size of file system entry
-    pub fn get_total_size(&self, _criteria: Criteria) -> u64 {
-        println!("{:#?}", self.directory_index.borrow());
-        95437
+    pub fn get_total_size(&self, criteria: Criteria) -> usize {
+        let mut matching_directory_sizes = vec![];
+
+        for (_key, directory) in self.directory_index.borrow().iter() {
+            let directory_size = *directory.borrow().size.borrow();
+            if directory_size >= criteria.size_range.0 && directory_size <= criteria.size_range.1 {
+                matching_directory_sizes.push(directory_size);
+            }
+        }
+
+        matching_directory_sizes.iter().sum()
     }
 
     /// Parses a replay of terminal input and output to a list of `TerminalEvent`s.
