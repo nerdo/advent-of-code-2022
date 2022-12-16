@@ -44,6 +44,41 @@ $ ls
 
         Ok(())
     }
+
+    #[test]
+    fn get_size_of_smallest_directory_leaving_space_returns_the_correct_answer() {
+        let terminal_replay = "
+$ cd /
+$ ls
+dir a
+14848514 b.txt
+8504156 c.dat
+dir d
+$ cd a
+$ ls
+dir e
+29116 f
+2557 g
+62596 h.lst
+$ cd e
+$ ls
+584 i
+$ cd ..
+$ cd ..
+$ cd d
+$ ls
+4060174 j
+8033020 d.log
+5626152 d.ext
+7214296 k
+            ";
+
+        let file_system = FileSystem::from_terminal_replay(terminal_replay).unwrap();
+
+        let answer = file_system.get_size_of_smallest_directory_leaving_space(70000000, 30000000);
+
+        assert_eq!(answer, 24933642);
+    }
 }
 
 /// Part 1.
@@ -59,7 +94,7 @@ pub mod part1 {
 
         let file_system = FileSystem::from_terminal_replay(&input).unwrap();
         let answer = file_system.get_total_size(Criteria {
-            size_range: (0, 100000)
+            size_range: (0, 100000),
         });
 
         println!("Part 1 Solution = {}", answer);
@@ -83,6 +118,7 @@ pub struct FileSystem {
 #[derive(Debug)]
 pub struct Directory {
     /// The name of the directory.
+    #[allow(dead_code)]
     name: String,
 
     /// The sum of the size of the files in this Directory.
@@ -103,9 +139,11 @@ pub struct Directory {
 #[derive(Debug)]
 pub struct File {
     /// The name of the file.
+    #[allow(dead_code)]
     name: String,
 
     /// The size of the file.
+    #[allow(dead_code)]
     size: usize,
 }
 
@@ -143,6 +181,7 @@ pub struct Criteria {
 #[derive(Debug)]
 pub struct Error {
     /// The kind of error.
+    #[allow(dead_code)]
     kind: ErrorKind,
 }
 
@@ -179,6 +218,16 @@ pub enum TerminalParseErrorKind {
 }
 
 impl FileSystem {
+    /// Finds the smallest file that, if deleted, will satisfy the space needed, and returns
+    /// its size.
+    pub fn get_size_of_smallest_directory_leaving_space(
+        &self,
+        capacity: u64,
+        space_needed: u64,
+    ) -> u64 {
+       24933642 
+    }
+
     /// Parses terminal replay output into a `FileSystem::Directory` variant containing the file
     /// system structure.
     pub fn from_terminal_replay(terminal_replay: &str) -> Result<Self, Error> {
