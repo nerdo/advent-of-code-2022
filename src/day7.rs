@@ -48,8 +48,22 @@ $ ls
 
 /// Part 1.
 pub mod part1 {
+    use std::{env::current_dir, fs::read_to_string};
+
+    use super::*;
+
     /// The solution for Part 1.
-    pub fn solution() {}
+    pub fn solution() {
+        let filename = current_dir().unwrap().join("src/data/day7.txt");
+        let input = read_to_string(filename).unwrap();
+
+        let file_system = FileSystem::from_terminal_replay(&input).unwrap();
+        let answer = file_system.get_total_size(Criteria {
+            size_range: (0, 100000)
+        });
+
+        println!("Part 1 Solution = {}", answer);
+    }
 }
 
 /// Part 2
