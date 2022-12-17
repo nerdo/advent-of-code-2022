@@ -77,7 +77,7 @@ $ ls
 
         let answer = file_system.get_size_of_smallest_directory_leaving_space(70000000, 30000000);
 
-        assert_eq!(answer, 24933642);
+        assert_eq!(answer, Some(24933642));
     }
 }
 
@@ -122,10 +122,10 @@ pub struct Directory {
     name: String,
 
     /// The sum of the size of the files in this Directory.
-    local_size: RefCell<usize>,
+    local_size: RefCell<u64>,
 
     /// The sum of the size of the files in this directory and any sub directories.
-    size: RefCell<usize>,
+    size: RefCell<u64>,
 
     /// List of files keyed by the file name.
     files: RefCell<HashMap<String, RefCell<File>>>,
@@ -144,14 +144,14 @@ pub struct File {
 
     /// The size of the file.
     #[allow(dead_code)]
-    size: usize,
+    size: u64,
 }
 
 /// Represents a listing in the file system.
 #[derive(Debug)]
 pub enum FileSystemListing {
     /// A file listing containing the file name and the file size.
-    File(String, usize),
+    File(String, u64),
 
     /// A directory listing containing the directory name.
     Directory(String),
@@ -174,7 +174,7 @@ pub enum TerminalEvent {
 #[derive(Debug)]
 pub struct Criteria {
     /// The size range to constrain [`get_total_size`]: #method.get_total_size to.
-    size_range: (usize, usize),
+    size_range: (u64, u64),
 }
 
 /// An error in the program.
@@ -224,8 +224,33 @@ impl FileSystem {
         &self,
         capacity: u64,
         space_needed: u64,
-    ) -> u64 {
-       24933642 
+    ) -> Option<u64> {
+        let space_used = *self
+            .directory_index
+            .borrow()
+            .get("/")
+            .unwrap()
+            .borrow()
+            .size
+            .borrow();
+
+        let mut sorted_directory_sizes = self
+            .directory_index
+            .borrow()
+            .values()
+            .into_iter()
+            .map(|rc| *rc.borrow().size.borrow())
+            .collect::<Vec<u64>>();
+        sorted_directory_sizes.sort();
+
+        for directory_size in sorted_directory_sizes {
+            let free_space_if_deleted = capacity - (space_used - directory_size);
+            if free_space_if_deleted >= space_needed {
+                return Some(directory_size);
+            }
+        }
+
+        None
     }
 
     /// Parses terminal replay output into a `FileSystem::Directory` variant containing the file
@@ -345,7 +370,7 @@ impl FileSystem {
     }
 
     /// Gets total size of file system entry
-    pub fn get_total_size(&self, criteria: Criteria) -> usize {
+    pub fn get_total_size(&self, criteria: Criteria) -> u64 {
         let mut matching_directory_sizes = vec![];
 
         for (_key, directory) in self.directory_index.borrow().iter() {
@@ -379,7 +404,7 @@ impl FileSystem {
                     let Ok(size) = parts
                         .first()
                         .ok_or(Error { kind: ErrorKind::TerminalParseError { kind: TerminalParseErrorKind::Generic, line: line.to_string(), parsed_line_number: line_number }})?
-                        .parse::<usize>() else {
+                        .parse::<u64>() else {
                             return Err(Error { kind: ErrorKind::TerminalParseError { kind: TerminalParseErrorKind::InvalidFileSize, line: line.to_string(), parsed_line_number: line_number }});
                     };
                     let name = parts
