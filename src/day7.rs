@@ -83,9 +83,8 @@ $ ls
 
 /// Part 1.
 pub mod part1 {
-    use std::{env::current_dir, fs::read_to_string};
-
     use super::*;
+    use std::{env::current_dir, fs::read_to_string};
 
     /// The solution for Part 1.
     pub fn solution() {
@@ -103,8 +102,19 @@ pub mod part1 {
 
 /// Part 2
 pub mod part2 {
+    use super::*;
+    use std::{env::current_dir, fs::read_to_string};
+
     /// The solution for Part 2.
-    pub fn solution() {}
+    pub fn solution() {
+        let filename = current_dir().unwrap().join("src/data/day7.txt");
+        let input = read_to_string(filename).unwrap();
+
+        let file_system = FileSystem::from_terminal_replay(&input).unwrap();
+        let answer = file_system.get_size_of_smallest_directory_leaving_space(70000000, 30000000);
+
+        println!("Part 2 Solution = {:?}", answer);
+    }
 }
 
 /// A filesystem.
