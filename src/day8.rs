@@ -2,6 +2,8 @@
 #![warn(missing_docs)]
 #![warn(clippy::unwrap_used)]
 
+use std::str::FromStr;
+
 use anyhow::{anyhow, bail, Error};
 
 #[cfg(test)]
@@ -68,19 +70,11 @@ pub struct Forest {
     height: usize,
 }
 
-impl Forest {
-    /// Gets a tree at a given coordinate in the Forest.
-    /// Both row_index and col_index start at 0.
-    // pub fn get_tree(&self, row_index: usize, col_index: usize) -> Option<&Tree> {
-    //     let Some(row) = self.trees.get(row_index) else {
-    //         return None;
-    //     };
-    //
-    //     row.get(col_index)
-    // }
+impl FromStr for Forest {
+    type Err = Error;
 
     /// Loads the representation of the Forest from a string.
-    pub fn from_str(input: &str) -> Result<Self, Error> {
+    fn from_str(input: &str) -> Result<Self, Error> {
         let mut heights = vec![];
         let mut forest_width = 0usize;
 
@@ -203,7 +197,9 @@ impl Forest {
             height: forest_height,
         })
     }
+}
 
+impl Forest {
     /// Gets the number of trees visible from the outside of the forest.
     pub fn get_num_visible_trees_from_outside(&self) -> u32 {
         self.trees
