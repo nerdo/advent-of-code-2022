@@ -142,41 +142,24 @@ impl FromStr for Forest {
                 row.iter()
                     .zip(0..)
                     .map(|(height, col_index)| {
-                        let is_visible_from_outside = 'block: {
-                            // The outside of the forest is always visible.
-                            if row_index == 0
-                                || col_index == 0
-                                || row_index == forest_height - 1
-                                || col_index == forest_width - 1
-                            {
-                                break 'block true;
-                            }
-
+                        let is_visible_from_outside = {
                             let row = &heights[row_index];
                             let col = &cols[col_index];
                             let is_visible_fn = |is_visible, h| is_visible && h < height;
 
                             let left = &row[..col_index];
-                            if left.iter().fold(true, is_visible_fn) {
-                                break 'block true;
-                            }
+                            let visible_from_left = left.iter().fold(true, is_visible_fn);
 
                             let right = &row[col_index + 1..];
-                            if right.iter().fold(true, is_visible_fn) {
-                                break 'block true;
-                            }
+                            let visible_from_right = right.iter().fold(true, is_visible_fn);
 
                             let above = &col[..row_index];
-                            if above.iter().copied().fold(true, is_visible_fn) {
-                                break 'block true;
-                            }
+                            let visible_from_above = above.iter().copied().fold(true, is_visible_fn);
 
                             let below = &col[row_index + 1..];
-                            if below.iter().copied().fold(true, is_visible_fn) {
-                                break 'block true;
-                            }
+                            let visible_from_below = below.iter().copied().fold(true, is_visible_fn);
 
-                            false
+                            visible_from_left || visible_from_right || visible_from_above || visible_from_below
                         };
 
                         Tree {
