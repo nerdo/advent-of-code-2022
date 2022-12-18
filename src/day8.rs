@@ -19,7 +19,7 @@ mod tests {
 
             ";
 
-        let forest = Forest::from(input)?;
+        let forest = Forest::from_str(input)?;
         let answer = forest.get_num_visible_trees_from_outside();
 
         assert_eq!(answer, 21);
@@ -30,8 +30,21 @@ mod tests {
 
 /// Part 1 of Day 8.
 pub mod part1 {
+    use super::*;
+    use std::{env::current_dir, fs::read_to_string};
+
     /// Solution for part 1 day 8.
-    pub fn solution() {}
+    pub fn solution() -> Result<(), Error> {
+        let filename = current_dir()?.join("src/data/day8.txt");
+        let input = read_to_string(filename)?;
+
+        let forest = Forest::from_str(&input)?;
+        let answer = forest.get_num_visible_trees_from_outside();
+
+        println!("Day 8 Part 1 = {answer}");
+
+        Ok(())
+    }
 }
 
 /// Represents a tree in the Forest.
@@ -67,7 +80,7 @@ impl Forest {
     // }
 
     /// Loads the representation of the Forest from a string.
-    pub fn from(input: &str) -> Result<Self, Error> {
+    pub fn from_str(input: &str) -> Result<Self, Error> {
         let mut heights = vec![];
         let mut forest_width = 0usize;
 
