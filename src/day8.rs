@@ -28,6 +28,25 @@ mod tests {
 
         Ok(())
     }
+
+    #[test]
+    fn get_highest_scenic_score_should_return_the_correct_answer() -> Result<(), Error> {
+        let input = "
+30373
+25512
+65332
+33549
+35390
+
+            ";
+
+        let forest = Forest::from_str(input)?;
+        let answer = forest.get_highest_scenic_score()?;
+
+        assert_eq!(answer, 8);
+
+        Ok(())
+    }
 }
 
 /// Part 1 of Day 8.
@@ -49,6 +68,25 @@ pub mod part1 {
     }
 }
 
+/// Part 2 of Day 8.
+pub mod part2 {
+    use super::*;
+    use std::{env::current_dir, fs::read_to_string};
+
+    /// Solution for part 2 day 8.
+    pub fn solution() -> Result<(), Error> {
+        let filename = current_dir()?.join("src/data/day8.txt");
+        let input = read_to_string(filename)?;
+
+        let forest = Forest::from_str(&input)?;
+        let answer = forest.get_highest_scenic_score()?;
+
+        println!("Day 8 Part 2 = {answer}");
+
+        Ok(())
+    }
+}
+
 /// Represents a tree in the Forest.
 pub struct Tree {
     /// The height of the tree.
@@ -56,6 +94,10 @@ pub struct Tree {
 
     /// Whether or not the tree is visible from outside the Forest.
     is_visible_from_outside: bool,
+
+    /// Scenic score for the tree.
+    /// The product of the viewing distance on each side of the tree.
+    scenic_score: u32,
 }
 
 /// Represents a forest as a grid of trees.
@@ -142,29 +184,62 @@ impl FromStr for Forest {
                 row.iter()
                     .zip(0..)
                     .map(|(height, col_index)| {
-                        let is_visible_from_outside = {
+                        let (is_visible_from_outside, scenic_score) = {
                             let row = &heights[row_index];
                             let col = &cols[col_index];
                             let is_visible_fn = |is_visible, h| is_visible && h < height;
+                            let get_viewing_distance = |(distance, blocked), h| {
+                                if blocked {
+                                    return (distance, true);
+                                }
+                                (distance + 1, h >= height)
+                            };
 
                             let left = &row[..col_index];
                             let visible_from_left = left.iter().fold(true, is_visible_fn);
+                            let left_scenic_score =
+                                left.iter().rev().fold((0, false), get_viewing_distance).0;
 
                             let right = &row[col_index + 1..];
                             let visible_from_right = right.iter().fold(true, is_visible_fn);
+                            let right_scenic_score =
+                                right.iter().fold((0, false), get_viewing_distance).0;
 
                             let above = &col[..row_index];
-                            let visible_from_above = above.iter().copied().fold(true, is_visible_fn);
+                            let visible_from_above =
+                                above.iter().copied().fold(true, is_visible_fn);
+                            let above_scenic_score = above
+                                .iter()
+                                .copied()
+                                .rev()
+                                .fold((0, false), get_viewing_distance)
+                                .0;
 
                             let below = &col[row_index + 1..];
-                            let visible_from_below = below.iter().copied().fold(true, is_visible_fn);
+                            let visible_from_below =
+                                below.iter().copied().fold(true, is_visible_fn);
+                            let below_scenic_score = below
+                                .iter()
+                                .copied()
+                                .fold((0, false), get_viewing_distance)
+                                .0;
 
-                            visible_from_left || visible_from_right || visible_from_above || visible_from_below
+                            (
+                                visible_from_left
+                                    || visible_from_right
+                                    || visible_from_above
+                                    || visible_from_below,
+                                left_scenic_score
+                                    * right_scenic_score
+                                    * above_scenic_score
+                                    * below_scenic_score,
+                            )
                         };
 
                         Tree {
                             height: *height,
                             is_visible_from_outside,
+                            scenic_score,
                         }
                     })
                     .collect::<Vec<Tree>>()
@@ -193,5 +268,14 @@ impl Forest {
             })
             .into_iter()
             .sum()
+    }
+
+    /// Gets the highest scenic score in the forest.
+    pub fn get_highest_scenic_score(&self) -> Result<u32, Error> {
+        self.trees
+            .iter()
+            .map(|t| t.scenic_score)
+            .max()
+            .ok_or_else(|| anyhow!("Error getting the highest scneic score."))
     }
 }
