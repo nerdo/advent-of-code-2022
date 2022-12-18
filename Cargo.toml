@@ -6,5 +6,5 @@ edition = "2021"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-anyhow = "1.0.67"
+anyhow = { version = "1.0.67", features = ["backtrace"]}
 thiserror = "1.0.38"
