@@ -90,7 +90,7 @@ pub mod part2 {
 /// Represents a tree in the Forest.
 pub struct Tree {
     /// The height of the tree.
-    height: u32,
+    _height: u32,
 
     /// Whether or not the tree is visible from outside the Forest.
     is_visible_from_outside: bool,
@@ -106,10 +106,10 @@ pub struct Forest {
     trees: Vec<Tree>,
 
     /// The width of the Forest.
-    width: usize,
+    _width: usize,
 
     /// The height of the Forest.
-    height: usize,
+    _height: usize,
 }
 
 impl FromStr for Forest {
@@ -237,7 +237,7 @@ impl FromStr for Forest {
                         };
 
                         Tree {
-                            height: *height,
+                            _height: *height,
                             is_visible_from_outside,
                             scenic_score,
                         }
@@ -251,8 +251,8 @@ impl FromStr for Forest {
 
         Ok(Forest {
             trees,
-            width: forest_width,
-            height: forest_height,
+            _width: forest_width,
+            _height: forest_height,
         })
     }
 }
