@@ -1,8 +1,8 @@
-use advent_of_code_2022::day8;
+use advent_of_code_2022::day9;
 
 use anyhow::Error;
 
 fn main() -> Result<(), Error> {
-    day8::part2::solution()?;
+    day9::part1::solution()?;
     Ok(())
 }
