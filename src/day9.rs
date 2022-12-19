@@ -42,10 +42,21 @@ R 2
 
 /// Part 1.
 pub mod part1 {
+    use std::{env::current_dir, fs::read_to_string};
+
     use super::*;
 
     /// Solution for Part 1.
     pub fn solution() -> Result<(), Error> {
+        let filename = current_dir()?.join("src/data/day9.txt");
+        let input = read_to_string(filename)?;
+
+        let rope = Rope::from_str(&input)?;
+
+        let answer = rope.get_number_of_positions_rope_tail_visits_at_least_once();
+
+        println!("Solution for day 9 part 1: {}", answer);
+
         Ok(())
     }
 }
