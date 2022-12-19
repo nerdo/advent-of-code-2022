@@ -102,7 +102,30 @@ pub mod part1 {
 
         let answer = rope.get_number_of_positions_rope_tail_visits_at_least_once();
 
+        println!("{}", rope);
         println!("Solution for day 9 part 1: {}", answer);
+
+        Ok(())
+    }
+}
+
+/// Part 2.
+pub mod part2 {
+    use std::{env::current_dir, fs::read_to_string};
+
+    use super::*;
+
+    /// Solution for Part 2.
+    pub fn solution() -> Result<(), Error> {
+        let filename = current_dir()?.join("src/data/day9.txt");
+        let input = read_to_string(filename)?;
+
+        let rope = Rope::parse(&input, 10)?;
+
+        let answer = rope.get_number_of_positions_rope_tail_visits_at_least_once();
+
+        println!("{}", rope);
+        println!("Solution for day 9 part 2: {}", answer);
 
         Ok(())
     }
@@ -319,7 +342,13 @@ impl Rope {
 
 impl Display for Rope {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        let (width, height, origin) = self.tail_positions_visited.iter().fold(
+        let unique_positions = self
+            .tail_positions_visited
+            .iter()
+            .copied()
+            .collect::<HashSet<Position>>();
+
+        let (width, height, origin) = unique_positions.iter().fold(
             Ok((1usize, 1usize, Position { x: 0, y: 0 })),
             |r, p| {
                 let Ok((w, h, o)) = r else {
@@ -336,13 +365,13 @@ impl Display for Rope {
                     origin.y = o.y.max(p.y.abs());
                 }
 
-                let width = 1 + w.max(
-                    (p.x.abs() + origin.x)
+                let width = w.max(
+                    (1 + p.x.abs() + origin.x)
                         .try_into()
                         .map_err(|_| std::fmt::Error)?,
                 );
-                let height = 1 + h.max(
-                    (p.y.abs() + origin.y)
+                let height = h.max(
+                    (1 + p.y.abs() + origin.y)
                         .try_into()
                         .map_err(|_| std::fmt::Error)?,
                 );
@@ -351,27 +380,19 @@ impl Display for Rope {
             },
         )?;
 
-        let mut buffer = ".".repeat(width * height);
+        let mut buffer = vec![".".to_string(); width * height];
         let mut plot = |c: char, p: Position| -> std::fmt::Result {
             let s = c.to_string();
             let row_offset: usize = p.y.try_into().map_err(|_| std::fmt::Error)?;
             let col_offset: usize = p.x.try_into().map_err(|_| std::fmt::Error)?;
             let index = width * row_offset + col_offset;
 
-            // https://stackoverflow.com/a/66662405/2057996
-            buffer.replace_range(
-                buffer
-                    .char_indices()
-                    .nth(index)
-                    .map(|(pos, ch)| (pos..pos + ch.len_utf8()))
-                    .expect("Unexpected error replacing character in Rope::Display."),
-                &s,
-            );
+            buffer[index] = s;
 
             Ok(())
         };
 
-        for p in self.tail_positions_visited.iter() {
+        for p in unique_positions.iter() {
             plot('#', origin + *p)?;
         }
 
@@ -380,7 +401,7 @@ impl Display for Rope {
         for i in (0..height).rev() {
             let start = i * width;
             let end = start + width;
-            writeln!(f, "{}", &buffer[start..end])?;
+            writeln!(f, "{}", &buffer[start..end].join(""))?;
         }
 
         write!(f, "({width} x {height}, origin = {origin:?})")
