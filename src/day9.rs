@@ -348,10 +348,14 @@ impl Display for Rope {
             .copied()
             .collect::<HashSet<Position>>();
 
-        let (width, height, origin) = unique_positions.iter().fold(
-            Ok((1usize, 1usize, Position { x: 0, y: 0 })),
+        let (lower_bound, upper_bound, origin) = unique_positions.iter().fold(
+            Ok((
+                Position { x: 0, y: 0 },
+                Position { x: 0, y: 0 },
+                Position { x: 0, y: 0 },
+            )),
             |r, p| {
-                let Ok((w, h, o)) = r else {
+                let Ok((l, u, o)) = r else {
                     return r;
                 };
 
@@ -365,26 +369,29 @@ impl Display for Rope {
                     origin.y = o.y.max(p.y.abs());
                 }
 
-                let width = w.max(
-                    (1 + p.x.abs() + origin.x)
-                        .try_into()
-                        .map_err(|_| std::fmt::Error)?,
-                );
-                let height = h.max(
-                    (1 + p.y.abs() + origin.y)
-                        .try_into()
-                        .map_err(|_| std::fmt::Error)?,
-                );
+                let lower = Position {
+                    x: l.x.min(p.x),
+                    y: l.y.min(p.y),
+                };
+                let upper = Position {
+                    x: u.x.max(p.x),
+                    y: u.y.max(p.y),
+                };
 
-                Ok((width, height, origin))
+                Ok((lower, upper, origin))
             },
         )?;
+
+        let width = usize::try_from(lower_bound.x.abs() + upper_bound.x.abs() + 1)
+            .map_err(|_| std::fmt::Error)?;
+        let height = usize::try_from(lower_bound.y.abs() + upper_bound.y.abs() + 1)
+            .map_err(|_| std::fmt::Error)?;
 
         let mut buffer = vec![".".to_string(); width * height];
         let mut plot = |c: char, p: Position| -> std::fmt::Result {
             let s = c.to_string();
-            let row_offset: usize = p.y.try_into().map_err(|_| std::fmt::Error)?;
-            let col_offset: usize = p.x.try_into().map_err(|_| std::fmt::Error)?;
+            let row_offset = usize::try_from(p.y).map_err(|_| std::fmt::Error)?;
+            let col_offset = usize::try_from(p.x).map_err(|_| std::fmt::Error)?;
             let index = width * row_offset + col_offset;
 
             buffer[index] = s;
