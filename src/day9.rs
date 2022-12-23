@@ -190,73 +190,87 @@ impl Rope {
         let mut head_position = start_position;
 
         // Move the head.
-        match direction {
-            "R" => {
-                head_position = Position {
-                    x: head_position.x + 1,
-                    y: head_position.y,
-                };
-            }
-            "L" => {
-                head_position = Position {
-                    x: head_position.x - 1,
-                    y: head_position.y,
-                };
-            }
-            "U" => {
-                head_position = Position {
-                    x: head_position.x,
-                    y: head_position.y + 1,
-                };
-            }
-            "D" => {
-                head_position = Position {
-                    x: head_position.x,
-                    y: head_position.y - 1,
-                };
-            }
+        head_position = match direction {
+            "R" => Position {
+                x: head_position.x + 1,
+                y: head_position.y,
+            },
+            "L" => Position {
+                x: head_position.x - 1,
+                y: head_position.y,
+            },
+            "U" => Position {
+                x: head_position.x,
+                y: head_position.y + 1,
+            },
+            "D" => Position {
+                x: head_position.x,
+                y: head_position.y - 1,
+            },
             _ => bail!("Invalid direction! This should never happen..."),
         };
 
         updated_knots.insert(0, head_position);
 
+        // Note: this can be optimized; as soon as anything is found to be touching, the rest of
+        // the knots don't need to be checked (they only move relative to their local head).
         for &tail_position in &knots[1..] {
-            // Conditionally adjust the tail.
-            let mut new_position = tail_position;
-            let offset = head_position - new_position;
-            let mut abs_offset = offset;
-            abs_offset.abs();
-            new_position = match abs_offset {
-                Position { x: 0, y: 0 }
-                | Position { x: 1, y: 0 }
-                | Position { x: 0, y: 1 }
-                | Position { x: 1, y: 1 } => new_position,
-                Position { x, y: _ } if x > 1 => {
-                    // Horizontal motion.
-                    Position {
-                        x: head_position.x
-                            + match head_position.x {
-                                x if x > new_position.x => -1,
-                                _ => 1,
-                            },
-                        y: head_position.y,
-                    }
-                }
-                Position { x: _, y } if y > 1 => {
-                    // Vertical motion.
-                    Position {
-                        x: head_position.x,
-                        y: head_position.y
-                            + match head_position.y {
-                                y if y > new_position.y => -1,
-                                _ => 1,
-                            },
-                    }
-                }
-                _ => {
-                    bail!("Unexpected motion: abs_offset = {abs_offset:?}, offset = {offset:?}");
-                }
+            let is_touching = |pos| {
+                let mut abs_offset = head_position - pos;
+                abs_offset.abs();
+                matches!(
+                    abs_offset,
+                    Position { x: 0, y: 0 }
+                        | Position { x: 1, y: 0 }
+                        | Position { x: 0, y: 1 }
+                        | Position { x: 1, y: 1 }
+                )
             };
+
+            let mut new_position = tail_position;
+
+            // Continually adjust the tail until it touches the head.
+            while !is_touching(new_position) {
+                let offset = head_position - new_position;
+
+                if offset.x == 0 {
+                    // Head and tail are in the same row.
+                    new_position = Position {
+                        x: head_position.x,
+                        y: if offset.y > 0 {
+                            head_position.y - 1
+                        } else {
+                            head_position.y + 1
+                        },
+                    };
+                } else if offset.y == 0 {
+                    // Head and tail are in the same column.
+                    new_position = Position {
+                        x: if offset.x > 0 {
+                            head_position.x - 1
+                        } else {
+                            head_position.x + 1
+                        },
+                        y: head_position.y,
+                    };
+                } else {
+                    // Head and tail arne't in the same rank/file, move diagonally until they
+                    // touch.
+                    let step_x = match offset.x {
+                        x if x > 0 => 1,
+                        _ => -1,
+                    };
+                    let step_y = match offset.y {
+                        y if y > 0 => 1,
+                        _ => -1,
+                    };
+                    new_position = new_position
+                        + Position {
+                            x: step_x,
+                            y: step_y,
+                        };
+                }
+            }
 
             head_position = new_position;
             updated_knots.insert(updated_knots.len(), new_position);
