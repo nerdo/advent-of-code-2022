@@ -378,6 +378,9 @@ pub mod part2 {
 pub struct CPU {
     /// A list of the CPU's instructiohs.
     instructions: Vec<Instruction>,
+
+    /// History of the execution of CPU instructions.
+    execution_history: Vec<Registers>,
 }
 
 impl CPU {
@@ -407,12 +410,16 @@ impl CPU {
             instructions.push(instruction);
         }
 
-        Ok(Self { instructions })
+        let execution_history = Self::execute(&instructions, Registers { x: 1 })?;
+
+        Ok(Self {
+            instructions,
+            execution_history,
+        })
     }
 
     /// Calculates and returns the sum of the signal strengths at the specified cycles.
     pub fn get_sum_of_signal_strengths_at_cycles(&self, cycles: &[u32]) -> Result<i32, Error> {
-        let register_history = self.execute(Registers { x: 1 })?;
         let mut signal_strengths = vec![];
 
         for cycle_number in cycles.iter() {
@@ -421,7 +428,7 @@ impl CPU {
             let cycle_index = usize::try_from(*cycle_number)
                 .context("Unable to cast cycle_number from u32 to usize!")?
                 - 1;
-            let (Registers { x }, _) = register_history.get(cycle_index).ok_or_else(|| {
+            let Registers { x } = self.execution_history.get(cycle_index).ok_or_else(|| {
                 anyhow!(
                     "out of bounds while getting register history at cycle number {cycle_number}"
                 )
@@ -438,24 +445,26 @@ impl CPU {
 
     /// Executes instructions and returns the register history for each cycle as a list of
     /// registers.
-    fn execute(&self, initial_registers: Registers) -> Result<Vec<(Registers, String)>, Error> {
+    pub fn execute(
+        instructions: &Vec<Instruction>,
+        initial_registers: Registers,
+    ) -> Result<Vec<Registers>, Error> {
         let mut registers = initial_registers.clone();
-        let mut register_history = vec![(initial_registers, "init".to_string())];
+        let mut register_history = vec![initial_registers];
 
-        for instruction in self.instructions.iter() {
+        for instruction in instructions.iter() {
             match instruction {
                 Instruction::Noop => {
                     registers = registers.clone();
-                    register_history.push((registers, "noop".to_string()));
+                    register_history.push(registers);
                 }
                 Instruction::Addx(x) => {
                     // This takes two cycles, for the first cycle, nothing changes.
-                    register_history
-                        .push((registers.clone(), format!("off cycle: {instruction:?}")));
+                    register_history.push(registers.clone());
 
                     // The value gets updated during the next cycle.
                     registers = Registers { x: registers.x + x };
-                    register_history.push((registers, format!("ON cycle: {instruction:?}")));
+                    register_history.push(registers);
                 }
             }
         }
