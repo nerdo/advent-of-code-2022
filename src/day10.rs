@@ -2,17 +2,7 @@
 #![warn(missing_docs)]
 #![warn(clippy::unwrap_used)]
 
-use anyhow::{bail, Error};
-
-/// Day 10, Part 1
-pub mod part1 {
-    use super::*;
-
-    /// Solution for day 10, part 1.
-    pub fn solution() -> Result<(), Error> {
-        bail!("Unimplemented");
-    }
-}
+use anyhow::{anyhow, bail, Context, Error};
 
 #[cfg(test)]
 mod tests {
@@ -173,7 +163,7 @@ noop
         let cpu = CPU::parse(input)?;
         let cycles = vec![20, 60, 100, 140, 180, 220];
 
-        let answer = cpu.get_sum_of_signal_strengths_at_cycles(&cycles);
+        let answer = cpu.get_sum_of_signal_strengths_at_cycles(&cycles)?;
 
         assert_eq!(answer, 13140);
 
@@ -181,17 +171,119 @@ noop
     }
 }
 
+/// Day 10, Part 1
+pub mod part1 {
+    use super::*;
+
+    /// Solution for day 10, part 1.
+    pub fn solution() -> Result<(), Error> {
+        Ok(())
+    }
+}
+
 /// Represents the CPU that theis in the elves' communication device.
-pub struct CPU {}
+#[derive(Debug)]
+pub struct CPU {
+    /// A list of the CPU's instructiohs.
+    instructions: Vec<Instruction>,
+}
 
 impl CPU {
     /// Parses the instructions from a string slice.
     pub fn parse(input: &str) -> Result<Self, Error> {
-        Ok(Self {})
+        let mut instructions = vec![];
+
+        for line in input.lines() {
+            let line = line.trim();
+            if line.is_empty() {
+                continue;
+            }
+
+            let instruction = match line {
+                "noop" => Instruction::Noop,
+                line if line.starts_with("addx ") => {
+                    let parts = line.split(" ").collect::<Vec<&str>>();
+                    let number = parts
+                        .get(1)
+                        .context("addx instruction is missing its argument")?
+                        .parse::<i32>()?;
+                    Instruction::Addx(number)
+                }
+                _ => bail!("Invalid instruction: {line}"),
+            };
+
+            instructions.push(instruction);
+        }
+
+        Ok(Self { instructions })
     }
 
     /// Calculates and returns the sum of the signal strengths at the specified cycles.
-    pub fn get_sum_of_signal_strengths_at_cycles(&self, cycles: &[u32]) -> i32 {
-        13140
+    pub fn get_sum_of_signal_strengths_at_cycles(&self, cycles: &[u32]) -> Result<i32, Error> {
+        let register_history = self.execute(Registers { x: 1 })?;
+        let mut signal_strengths = vec![];
+
+        for cycle_number in cycles.iter() {
+            // The -1 here is to be able to see the register value AFTER the particular cycle has
+            // completed.
+            let cycle_index = usize::try_from(*cycle_number)
+                .context("Unable to cast cycle_number from u32 to usize!")?
+                - 1;
+            let (Registers { x }, _) = register_history.get(cycle_index).ok_or_else(|| {
+                anyhow!(
+                    "out of bounds while getting register history at cycle number {cycle_number}"
+                )
+            })?;
+
+            let strength = i32::try_from(*cycle_number)
+                .context("Unable to cast cycle_number from u32 to i32!")?
+                * x;
+            signal_strengths.push(strength);
+        }
+
+        Ok(signal_strengths.iter().sum::<i32>())
     }
+
+    /// Executes instructions and returns the register history for each cycle as a list of
+    /// registers.
+    fn execute(&self, initial_registers: Registers) -> Result<Vec<(Registers, String)>, Error> {
+        let mut registers = initial_registers.clone();
+        let mut register_history = vec![(initial_registers, "init".to_string())];
+
+        for instruction in self.instructions.iter() {
+            match instruction {
+                Instruction::Noop => {
+                    registers = registers.clone();
+                    register_history.push((registers, "noop".to_string()));
+                }
+                Instruction::Addx(x) => {
+                    // This takes two cycles, for the first cycle, nothing changes.
+                    register_history
+                        .push((registers.clone(), format!("off cycle: {instruction:?}")));
+
+                    // The value gets updated during the next cycle.
+                    registers = Registers { x: registers.x + x };
+                    register_history.push((registers, format!("ON cycle: {instruction:?}")));
+                }
+            }
+        }
+
+        Ok(register_history)
+    }
+}
+
+/// A CPU instruction.
+#[derive(Debug)]
+pub enum Instruction {
+    /// No operation.
+    Noop,
+
+    /// Add x instruction.
+    Addx(i32),
+}
+
+/// CPU registers.
+#[derive(Debug, Copy, Clone)]
+pub struct Registers {
+    x: i32,
 }
