@@ -173,10 +173,23 @@ noop
 
 /// Day 10, Part 1
 pub mod part1 {
+    use std::{env::current_dir, fs::read_to_string};
+
     use super::*;
 
     /// Solution for day 10, part 1.
     pub fn solution() -> Result<(), Error> {
+        let filename = current_dir()
+            .context("std::env::current_dir() failed")?
+            .join("src/data/day10.txt");
+        let input = read_to_string(filename).context("std::fs::read_to_string() failed")?;
+        let cycles = vec![20, 60, 100, 140, 180, 220];
+        let cpu = CPU::parse(&input)?;
+
+        let answer = cpu.get_sum_of_signal_strengths_at_cycles(&cycles)?;
+
+        println!("Day 10 Part 1 = {answer}");
+
         Ok(())
     }
 }
