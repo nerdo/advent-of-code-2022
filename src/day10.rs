@@ -324,7 +324,16 @@ noop
 
         let cpu = CPU::parse(input)?;
 
-        let answer = cpu.get_crt_output()?;
+        let crt_row_cycle_ranges = vec![
+            (1, 40),
+            (41, 80),
+            (81, 120),
+            (121, 160),
+            (161, 200),
+            (201, 240),
+        ];
+        let answer = cpu.get_crt_output(&crt_row_cycle_ranges)?;
+        println!("{}", answer);
 
         assert_eq!(
             answer,
@@ -473,14 +482,45 @@ impl CPU {
     }
 
     /// Gets the crt output as a string.
-    pub fn get_crt_output(&self) -> Result<String, Error> {
-        Ok("##..##..##..##..##..##..##..##..##..##..
-###...###...###...###...###...###...###.
-####....####....####....####....####....
-#####.....#####.....#####.....#####.....
-######......######......######......####
-#######.......#######.......#######....."
-            .to_string())
+    /// Takes a vector of tuples. Each tuple represents a row on the CRT and the tuple's first
+    /// value is the CPU cycle that corresponds to the first pixel in that row. The tuple's last
+    /// value is the CPU cycle that corresponds to the last pixel in that row.
+    pub fn get_crt_output(&self, crt_row_cycle_ranges: &[(usize, usize)]) -> Result<String, Error> {
+        Ok(crt_row_cycle_ranges
+            .iter()
+            .map(|cycle_range| {
+                let mut row = String::new();
+
+                for (index, cycle_number) in (cycle_range.0..=cycle_range.1).enumerate() {
+                    // Grab the sprite position.
+                    // The -1 here is to be able to see the register value AFTER the particular cycle has
+                    // completed.
+                    let Registers { x: sprite_position } = self
+                        .execution_history
+                        .get(cycle_number - 1)
+                        .context("Unable to get execution history at CPU cycle {cycle_number}")?;
+
+                    // Convert index to i32 for comparison with sprite_index.
+                    let pixel_position = i32::try_from(index).with_context(|| {
+                        format!("Unable to convert index from {index}usize to i32!")
+                    })?;
+
+                    // Set the pixel according to whether it falls within the 3-wide sprite.
+                    let pixel = if pixel_position >= sprite_position - 1
+                        && pixel_position <= sprite_position + 1
+                    {
+                        '#'
+                    } else {
+                        '.'
+                    };
+
+                    row.push(pixel);
+                }
+
+                Ok(row)
+            })
+            .collect::<Result<Vec<String>, Error>>()?
+            .join("\n"))
     }
 }
 
