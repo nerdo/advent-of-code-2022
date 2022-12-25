@@ -374,10 +374,31 @@ pub mod part1 {
 
 /// Day 10, Part 2
 pub mod part2 {
+    use std::{env::current_dir, fs::read_to_string};
+
     use super::*;
 
     /// Solution for day 10, part 2.
     pub fn solution() -> Result<(), Error> {
+        let filename = current_dir()
+            .context("std::env::current_dir() failed")?
+            .join("src/data/day10.txt");
+        let input = read_to_string(filename).context("std::fs::read_to_string() failed")?;
+        let cpu = CPU::parse(&input)?;
+        let crt_row_cycle_ranges = vec![
+            (1, 40),
+            (41, 80),
+            (81, 120),
+            (121, 160),
+            (161, 200),
+            (201, 240),
+        ];
+
+        let answer = cpu.get_crt_output(&crt_row_cycle_ranges)?;
+
+        println!("Day 10 Part 2");
+        println!("{answer}");
+
         Ok(())
     }
 }
