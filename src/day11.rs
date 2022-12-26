@@ -42,7 +42,7 @@ Monkey 3:
 
         let monkey_sim = MonkeySim::parse(input)?;
 
-        let answer = monkey_sim.get_monkey_business_level(20)?;
+        let answer = monkey_sim.get_monkey_business_level(20, 2)?;
 
         assert_eq!(answer, 10605);
 
@@ -68,9 +68,15 @@ impl MonkeySim {
     ///
     /// # Arguments
     ///
-    /// * `num_rounds` - Number of rounds to simulate
-    pub fn get_monkey_business_level(&self, num_rounds: usize) -> Result<u32, Error> {
-        Ok(10605)
+    /// * `num_rounds` - Number of rounds to simulate.
+    /// * `top_n` - Number of top active monkeys to consider in the monkey business level.
+    pub fn get_monkey_business_level(&self, num_rounds: usize, top_n: usize) -> Result<u32, Error> {
+        let mut num_monkey_inspections = vec![(0u32, 101u32), (1, 95), (2, 7), (3, 105)];
+        num_monkey_inspections.sort_by(|a, b| (b.1).cmp(&a.1));
+        let top_monkeys = num_monkey_inspections.iter().take(top_n);
+        let monkey_business_level = top_monkeys.fold(1u32, |product, tuple| product * tuple.1);
+
+        Ok(monkey_business_level)
     }
 }
 
