@@ -4,7 +4,7 @@
 
 use std::cell::RefCell;
 
-use anyhow::{Context, Error};
+use anyhow::{bail, Context, Error};
 
 #[cfg(test)]
 mod tests {
@@ -66,8 +66,120 @@ impl MonkeySim {
     ///
     /// * `input` - The string description of the monkeys' initial state.
     pub fn parse(input: &str) -> Result<Self, Error> {
+        let mut monkeys = vec![];
+        let mut cell = RefCell::new(None);
+
+        for line in input.lines() {
+            let line = line.trim();
+            if line.is_empty() {
+                continue;
+            }
+
+            if line.starts_with("Monkey ") {
+                // We're done with the previous monkey, add it to our list.
+                if let Some(monkey) = cell.borrow_mut().take() {
+                    monkeys.push(RefCell::new(monkey));
+                }
+
+                // Get the current monkey number from the line.
+                let monkey_number = {
+                    let (_, end_of_line) = line.split_at("Monkey ".len());
+                    let parts = end_of_line.split(':').collect::<Vec<&str>>();
+
+                    parts
+                        .first()
+                        .with_context(|| format!("Parsing monkey number from line {}", line))?
+                        .parse::<usize>()?
+                };
+
+                // Reset the variables.
+                cell = RefCell::new(Some(MonkeyState {
+                    number: monkey_number,
+                    items: RefCell::new(vec![]),
+                    operation: None,
+                    test: 0,
+                    test_fail_monkey_number: 0,
+                    test_pass_monkey_number: 0,
+                    num_insepctions: RefCell::new(0),
+                }));
+            } else if line.starts_with("Starting items: ") {
+                let Some(ref mut monkey) = *cell.borrow_mut() else {
+                    bail!(
+                        "No monkey initialized - parsing starting items from line {}",
+                        line
+                    );
+                };
+
+                // Parse items.
+                let items = {
+                    let (_, end_of_line) = line.split_at("Starting items: ".len());
+                    let items_str = end_of_line.split(',').collect::<Vec<&str>>();
+                    items_str
+                        .iter()
+                        .map(|item_str| {
+                            item_str.trim().parse::<u32>().with_context(|| {
+                                format!("Parsing starting items from line {}: '{}'", line, item_str)
+                            })
+                        })
+                        .collect::<Result<Vec<u32>, Error>>()?
+                };
+
+                *monkey.items.borrow_mut() = items;
+            } else if line.starts_with("Operation: new = ") {
+                let Some(ref mut monkey) = *cell.borrow_mut() else {
+                    bail!(
+                        "No monkey initialized - parsing operation from line {}",
+                        line
+                    );
+                };
+
+                let operation = {
+                    let (_, end_of_line) = line.split_at("Operation: new = ".len());
+                    let parts = end_of_line.split(' ').collect::<Vec<&str>>();
+
+                    let (a, b) = {
+                        let get_operand = |input: Option<&str>| {
+                            Ok(match input {
+                                None => {
+                                    bail!(
+                                        "No operands found in the operation in the line: {}",
+                                        line
+                                    )
+                                }
+                                Some(s) if s == "old" => Operand::OldValue,
+                                Some(number_str) => {
+                                    Operand::Constant(number_str.trim().parse::<u32>()?)
+                                }
+                            })
+                        };
+
+                        let a = get_operand(parts.first().copied())?;
+                        let b = get_operand(parts.last().copied())?;
+
+                        (a, b)
+                    };
+
+                    match parts.get(1) {
+                        None => bail!("No operator found in the operation in the line: {}.", line),
+                        Some(s) if s == &"*" => Operation::Product(a, b),
+                        Some(s) if s == &"+" => Operation::Addition(a, b),
+                        _ => bail!("Unsupported operation gound on the line: {}.", line),
+                    }
+                };
+
+                monkey.operation = Some(operation);
+            }
+        }
+
+        // Don't forget that last monkey!
+        if let Some(monkey) = cell.borrow_mut().take() {
+            monkeys.push(RefCell::new(monkey));
+        }
+
+        println!("Monkeys: {:#?}", monkeys);
+
         Ok(MonkeySim {
-            initial_monkey_states: vec![],
+            initial_monkey_states: monkeys,
         })
     }
 
@@ -89,7 +201,10 @@ impl MonkeySim {
 
                     // Inspect each item.
                     for item in monkey.items.borrow_mut().drain(..) {
-                        let mut worry_level = monkey.operation.execute(item)?;
+                        let Some(ref operation) = monkey.operation else {
+                            bail!("No operation found for monkey #{}, round #{}.", monkey.number, round_number);
+                        };
+                        let mut worry_level = operation.execute(item)?;
 
                         // Alter the worry level since it didn't break...
                         worry_level = (f64::from(worry_level) / 3.0).floor() as u32;
@@ -105,7 +220,7 @@ impl MonkeySim {
                         {
                             let recipient_monkey = new_round
                                 .get(recipient_monkey_number)
-                                .with_context(|| format!("Tried to grab monkey #{} in round #{} from list of monkeys with len = {}", recipient_monkey_number, round_number, new_round.len()))?;
+                                .with_context(|| format!("Tried to grab monkey #{} in round #{} from list of monkeys with len = {}.", recipient_monkey_number, round_number, new_round.len()))?;
                             let recipient_monkey = recipient_monkey.borrow_mut();
                             recipient_monkey.items.borrow_mut().push(worry_level);
                         }
@@ -151,7 +266,7 @@ pub struct MonkeyState {
     items: RefCell<Vec<u32>>,
 
     /// Operation performed to calculate your new worry level.
-    operation: Operation,
+    operation: Option<Operation>,
 
     /// Test value used to determine which monkey your stuff gets thrown to.
     test: u32,
@@ -169,7 +284,11 @@ pub struct MonkeyState {
 /// Represents an operation that calculates your new worry level.
 #[derive(Debug, Clone)]
 pub enum Operation {
-    None,
+    /// The addition of two operands.
+    Addition(Operand, Operand),
+
+    /// The product of two operands.
+    Product(Operand, Operand),
 }
 
 impl Operation {
@@ -180,9 +299,19 @@ impl Operation {
     /// `value` - The value to execute the operation on.
     pub fn execute(&self, value: u32) -> Result<u32, Error> {
         Ok(match self {
-            Operation::None => value,
+            _ => todo!(),
         })
     }
+}
+
+/// Repersents an operand in an operation.
+#[derive(Debug, Clone)]
+pub enum Operand {
+    /// A constant value.
+    Constant(u32),
+
+    /// The old value.
+    OldValue,
 }
 
 /// Part 1
