@@ -212,8 +212,6 @@ impl MonkeySim {
             monkeys.push(RefCell::new(monkey));
         }
 
-        println!("Monkeys: {:#?}", monkeys);
-
         Ok(MonkeySim {
             initial_monkey_states: monkeys,
         })
