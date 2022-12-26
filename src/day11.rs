@@ -168,6 +168,42 @@ impl MonkeySim {
                 };
 
                 monkey.operation = Some(operation);
+            } else if line.starts_with("Test: divisible by ") {
+                let Some(ref mut monkey) = *cell.borrow_mut() else {
+                    bail!(
+                        "No monkey initialized - parsing test operand from line {}",
+                        line
+                    );
+                };
+
+                let (_, end_of_line) = line.split_at("Test: divisible by ".len());
+                let test = end_of_line.trim().parse::<u32>()?;
+
+                monkey.test = test;
+            } else if line.starts_with("If true: throw to monkey ") {
+                let Some(ref mut monkey) = *cell.borrow_mut() else {
+                    bail!(
+                        "No monkey initialized - parsing test operand from line {}",
+                        line
+                    );
+                };
+
+                let (_, end_of_line) = line.split_at("If true: throw to monkey ".len());
+                let target_monkey_number = end_of_line.trim().parse::<usize>()?;
+
+                monkey.test_pass_monkey_number = target_monkey_number;
+            } else if line.starts_with("If false: throw to monkey ") {
+                let Some(ref mut monkey) = *cell.borrow_mut() else {
+                    bail!(
+                        "No monkey initialized - parsing test operand from line {}",
+                        line
+                    );
+                };
+
+                let (_, end_of_line) = line.split_at("If false: throw to monkey ".len());
+                let target_monkey_number = end_of_line.trim().parse::<usize>()?;
+
+                monkey.test_fail_monkey_number = target_monkey_number;
             }
         }
 
@@ -271,11 +307,11 @@ pub struct MonkeyState {
     /// Test value used to determine which monkey your stuff gets thrown to.
     test: u32,
 
-    /// The monkey number that gets your item if the test fails.
-    test_fail_monkey_number: usize,
-
     /// The monkey number that gets your item if the test passes.
     test_pass_monkey_number: usize,
+
+    /// The monkey number that gets your item if the test fails.
+    test_fail_monkey_number: usize,
 
     /// The number of items this monkey has inspected.
     num_insepctions: RefCell<u32>,
