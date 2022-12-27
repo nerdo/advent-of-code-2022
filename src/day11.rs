@@ -44,7 +44,7 @@ Monkey 3:
 
         let monkey_sim = MonkeySim::parse(input)?;
 
-        let answer = monkey_sim.get_monkey_business_level(20, 2)?;
+        let answer = monkey_sim.get_monkey_business_level(20, 2, Some(3.0))?;
 
         assert_eq!(answer, 10605);
 
@@ -223,7 +223,13 @@ impl MonkeySim {
     ///
     /// * `num_rounds` - Number of rounds to simulate.
     /// * `top_n` - Number of top active monkeys to consider in the monkey business level.
-    pub fn get_monkey_business_level(&self, num_rounds: usize, top_n: usize) -> Result<u32, Error> {
+    /// * `worry_level_divisor` - Number to divivide the worry level by after each monkey inspects an item.
+    pub fn get_monkey_business_level(
+        &self,
+        num_rounds: usize,
+        top_n: usize,
+        worry_level_divisor: Option<f64>,
+    ) -> Result<u32, Error> {
         let mut num_monkey_inspections: Vec<(usize, u32)> = {
             let round = RefCell::new(
                 self.initial_monkey_states
@@ -249,7 +255,10 @@ impl MonkeySim {
                         let mut worry_level = operation.execute(item);
 
                         // Alter the worry level since it didn't break...
-                        worry_level = (f64::from(worry_level) / 3.0).floor() as u32;
+                        worry_level = match worry_level_divisor {
+                            None => worry_level,
+                            Some(n) => (f64::from(worry_level) / n).floor() as u32,
+                        };
 
                         // Figure out which monkey will receive this item.
                         let recipient_monkey_number = if worry_level % monkey.test == 0 {
@@ -391,7 +400,7 @@ pub mod part1 {
 
         let monkey_sim = MonkeySim::parse(&input)?;
 
-        let answer = monkey_sim.get_monkey_business_level(20, 2)?;
+        let answer = monkey_sim.get_monkey_business_level(20, 2, Some(3.0))?;
 
         println!("Day 11 Solution = {}", answer);
 
