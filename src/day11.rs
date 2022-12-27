@@ -282,18 +282,37 @@ impl MonkeySim {
             );
 
             for round_number in 1..=num_rounds {
-                {
-                    let num_monkey_inspections = round
-                        .borrow()
-                        .iter()
-                        .map(|m| {
-                            let m = m.borrow();
-                            let num_inspections = m.num_insepctions;
-                            num_inspections
-                        })
-                        .collect::<Vec<u64>>();
-                    println!("Round #{} = {:?}", round_number, num_monkey_inspections);
-                }
+                // Alter the worry level since it didn't break...
+                let worry_level_divisor = match worry_manager {
+                    WorryManager::Constant(n) => n,
+                    WorryManager::Dynamic => {
+                        1.0
+                        // I think it has to do with prime numbers... All the test divisors
+                        // are prime, so maybe the way to keep it under control (and in
+                        // line with the sample output) is to find the largest prime
+                        // smaller than the round number?
+                        // let mut prime_number = u32::try_from(round_number)?;
+                        // let is_prime = |n| {
+                        //     if n < 2 {
+                        //         return true;
+                        //     }
+                        //     for test in (2..n - 1).rev() {
+                        //         if n % test == 0 {
+                        //             return false;
+                        //         }
+                        //     }
+                        //     true
+                        // };
+
+                        // while !is_prime(prime_number) {
+                        //     prime_number -= 1;
+                        // }
+
+                        // prime_number = prime_number.max(1);
+                        // println!("prime = {}", prime_number);
+                        // f64::try_from(prime_number)?
+                    }
+                };
 
                 for monkey in round.borrow().iter() {
                     // Grab the number of inspections about to happen (because the list will get
@@ -309,11 +328,8 @@ impl MonkeySim {
                         };
                         let mut worry_level = operation.execute(item);
 
-                        // Alter the worry level since it didn't break...
-                        worry_level = match worry_manager {
-                            WorryManager::Constant(n) => (worry_level as f64 / n).floor() as u64,
-                            WorryManager::Dynamic => worry_level,
-                        };
+                        println!("worry level = {}", worry_level);
+                        worry_level = (worry_level as f64 / worry_level_divisor).floor() as u64;
 
                         // Figure out which monkey will receive this item.
                         let recipient_monkey_number = if worry_level % monkey.test == 0 {
@@ -339,6 +355,19 @@ impl MonkeySim {
                     }
 
                     monkey.borrow_mut().num_insepctions += num_inspections;
+                }
+
+                {
+                    let num_monkey_inspections = round
+                        .borrow()
+                        .iter()
+                        .map(|m| {
+                            let m = m.borrow();
+                            let num_inspections = m.num_insepctions;
+                            num_inspections
+                        })
+                        .collect::<Vec<u64>>();
+                    println!("Round #{} = {:?}", round_number, num_monkey_inspections);
                 }
             }
 
