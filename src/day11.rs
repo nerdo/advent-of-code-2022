@@ -56,7 +56,7 @@ Monkey 3:
 #[derive(Debug)]
 pub struct MonkeySim {
     /// The initial state of the monkeys.
-    initial_monkey_states: Vec<RefCell<MonkeyState>>,
+    initial_monkey_states: Vec<MonkeyState>,
 }
 
 impl MonkeySim {
@@ -78,7 +78,7 @@ impl MonkeySim {
             if line.starts_with("Monkey ") {
                 // We're done with the previous monkey, add it to our list.
                 if let Some(monkey) = cell.borrow_mut().take() {
-                    monkeys.push(RefCell::new(monkey));
+                    monkeys.push(monkey);
                 }
 
                 // Get the current monkey number from the line.
@@ -100,7 +100,7 @@ impl MonkeySim {
                     test: 0,
                     test_fail_monkey_number: 0,
                     test_pass_monkey_number: 0,
-                    num_insepctions: RefCell::new(0),
+                    num_insepctions: 0,
                 }));
             } else if line.starts_with("Starting items: ") {
                 let Some(ref mut monkey) = *cell.borrow_mut() else {
@@ -124,7 +124,7 @@ impl MonkeySim {
                         .collect::<Result<Vec<u32>, Error>>()?
                 };
 
-                *monkey.items.borrow_mut() = items;
+                monkey.items = RefCell::new(items);
             } else if line.starts_with("Operation: new = ") {
                 let Some(ref mut monkey) = *cell.borrow_mut() else {
                     bail!(
@@ -209,7 +209,7 @@ impl MonkeySim {
 
         // Don't forget that last monkey!
         if let Some(monkey) = cell.borrow_mut().take() {
-            monkeys.push(RefCell::new(monkey));
+            monkeys.push(monkey);
         }
 
         Ok(MonkeySim {
@@ -225,20 +225,28 @@ impl MonkeySim {
     /// * `top_n` - Number of top active monkeys to consider in the monkey business level.
     pub fn get_monkey_business_level(&self, num_rounds: usize, top_n: usize) -> Result<u32, Error> {
         let mut num_monkey_inspections: Vec<(usize, u32)> = {
-            let mut last_round = Box::new(&self.initial_monkey_states);
+            let round = RefCell::new(
+                self.initial_monkey_states
+                    .clone()
+                    .into_iter()
+                    .map(RefCell::new)
+                    .collect::<Vec<RefCell<MonkeyState>>>(),
+            );
 
             for round_number in 1..=num_rounds {
-                let new_round = last_round.clone();
-
-                for monkey in *new_round {
-                    let monkey = monkey.borrow();
+                for monkey in round.borrow().iter() {
+                    // Grab the number of inspections about to happen (because the list will get
+                    // drained.
+                    let num_inspections = u32::try_from(monkey.borrow().items.borrow().len())?;
 
                     // Inspect each item.
-                    for item in monkey.items.borrow_mut().drain(..) {
+                    for item in monkey.borrow().items.borrow_mut().drain(..) {
+                        let monkey = monkey.borrow();
+
                         let Some(ref operation) = monkey.operation else {
                             bail!("No operation found for monkey #{}, round #{}.", monkey.number, round_number);
                         };
-                        let mut worry_level = operation.execute(item)?;
+                        let mut worry_level = operation.execute(item);
 
                         // Alter the worry level since it didn't break...
                         worry_level = (f64::from(worry_level) / 3.0).floor() as u32;
@@ -251,30 +259,32 @@ impl MonkeySim {
                         };
 
                         // Update the recipient's list.
-                        {
-                            let recipient_monkey = new_round
-                                .get(recipient_monkey_number)
-                                .with_context(|| format!("Tried to grab monkey #{} in round #{} from list of monkeys with len = {}.", recipient_monkey_number, round_number, new_round.len()))?;
-                            let recipient_monkey = recipient_monkey.borrow_mut();
-                            recipient_monkey.items.borrow_mut().push(worry_level);
-                        }
+                        round
+                            .borrow()
+                            .get(recipient_monkey_number)
+                            .with_context(|| {
+                                format!(
+                                    "Trying to get recipient monkey #{} to throw item to.",
+                                    recipient_monkey_number
+                                )
+                            })?
+                            .borrow_mut()
+                            .items
+                            .borrow_mut()
+                            .push(worry_level);
                     }
 
-                    *monkey.num_insepctions.borrow_mut() +=
-                        u32::try_from(monkey.items.borrow().len())?;
+                    monkey.borrow_mut().num_insepctions += num_inspections;
                 }
-
-                last_round = new_round;
             }
 
-            // Shadow last_round with the unboxed, immmutable reference.
-            let last_round = *last_round;
-
-            let num_monkey_inspections = last_round
+            let num_monkey_inspections = round
+                .borrow()
                 .iter()
                 .map(|m| {
-                    let monkey_number = m.borrow().number;
-                    let num_inspections = *m.borrow().num_insepctions.borrow();
+                    let m = m.borrow();
+                    let monkey_number = m.number;
+                    let num_inspections = m.num_insepctions;
                     (monkey_number, num_inspections)
                 })
                 .collect();
@@ -312,7 +322,7 @@ pub struct MonkeyState {
     test_fail_monkey_number: usize,
 
     /// The number of items this monkey has inspected.
-    num_insepctions: RefCell<u32>,
+    num_insepctions: u32,
 }
 
 /// Represents an operation that calculates your new worry level.
@@ -331,10 +341,30 @@ impl Operation {
     /// # Arguments
     ///
     /// `value` - The value to execute the operation on.
-    pub fn execute(&self, value: u32) -> Result<u32, Error> {
-        Ok(match self {
-            _ => todo!(),
-        })
+    pub fn execute(&self, value: u32) -> u32 {
+        let get_operands = |first_operand: &Operand, second_operand: &Operand| {
+            (
+                match first_operand {
+                    Operand::Constant(n) => *n,
+                    Operand::OldValue => value,
+                },
+                match second_operand {
+                    Operand::Constant(n) => *n,
+                    Operand::OldValue => value,
+                },
+            )
+        };
+
+        match self {
+            Self::Product(first_operand, second_operand) => {
+                let (a, b) = get_operands(first_operand, second_operand);
+                a * b
+            }
+            Self::Addition(first_operand, second_operand) => {
+                let (a, b) = get_operands(first_operand, second_operand);
+                a + b
+            }
+        }
     }
 }
 
