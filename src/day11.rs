@@ -6,7 +6,7 @@ use std::cell::RefCell;
 
 use anyhow::{bail, Context, Error};
 
-#[cfg(test)]
+// #[cfg(test)]
 mod tests {
     use super::*;
 
@@ -44,9 +44,51 @@ Monkey 3:
 
         let monkey_sim = MonkeySim::parse(input)?;
 
-        let answer = monkey_sim.get_monkey_business_level(20, 2, Some(3.0))?;
+        let answer = monkey_sim.get_monkey_business_level(20, 2, WorryManager::Constant(3.0))?;
 
         assert_eq!(answer, 10605);
+
+        Ok(())
+    }
+
+    // #[test]
+    pub fn get_monkey_business_level_returns_the_correct_answer_after_10000_rounds(
+    ) -> Result<(), Error> {
+        let input = "
+Monkey 0:
+  Starting items: 79, 98
+  Operation: new = old * 19
+  Test: divisible by 23
+    If true: throw to monkey 2
+    If false: throw to monkey 3
+
+Monkey 1:
+  Starting items: 54, 65, 75, 74
+  Operation: new = old + 6
+  Test: divisible by 19
+    If true: throw to monkey 2
+    If false: throw to monkey 0
+
+Monkey 2:
+  Starting items: 79, 60, 97
+  Operation: new = old * old
+  Test: divisible by 13
+    If true: throw to monkey 1
+    If false: throw to monkey 3
+
+Monkey 3:
+  Starting items: 74
+  Operation: new = old + 3
+  Test: divisible by 17
+    If true: throw to monkey 0
+    If false: throw to monkey 1
+    ";
+
+        let monkey_sim = MonkeySim::parse(input)?;
+
+        let answer = monkey_sim.get_monkey_business_level(20, 2, WorryManager::Dynamic)?;
+
+        assert_eq!(answer, 2713310158);
 
         Ok(())
     }
@@ -117,11 +159,11 @@ impl MonkeySim {
                     items_str
                         .iter()
                         .map(|item_str| {
-                            item_str.trim().parse::<u32>().with_context(|| {
+                            item_str.trim().parse::<u64>().with_context(|| {
                                 format!("Parsing starting items from line {}: '{}'", line, item_str)
                             })
                         })
-                        .collect::<Result<Vec<u32>, Error>>()?
+                        .collect::<Result<Vec<u64>, Error>>()?
                 };
 
                 monkey.items = RefCell::new(items);
@@ -148,7 +190,7 @@ impl MonkeySim {
                                 }
                                 Some(s) if s == "old" => Operand::OldValue,
                                 Some(number_str) => {
-                                    Operand::Constant(number_str.trim().parse::<u32>()?)
+                                    Operand::Constant(number_str.trim().parse::<u64>()?)
                                 }
                             })
                         };
@@ -177,7 +219,7 @@ impl MonkeySim {
                 };
 
                 let (_, end_of_line) = line.split_at("Test: divisible by ".len());
-                let test = end_of_line.trim().parse::<u32>()?;
+                let test = end_of_line.trim().parse::<u64>()?;
 
                 monkey.test = test;
             } else if line.starts_with("If true: throw to monkey ") {
@@ -228,9 +270,9 @@ impl MonkeySim {
         &self,
         num_rounds: usize,
         top_n: usize,
-        worry_level_divisor: Option<f64>,
-    ) -> Result<u32, Error> {
-        let mut num_monkey_inspections: Vec<(usize, u32)> = {
+        worry_manager: WorryManager,
+    ) -> Result<u64, Error> {
+        let mut num_monkey_inspections: Vec<(usize, u64)> = {
             let round = RefCell::new(
                 self.initial_monkey_states
                     .clone()
@@ -240,10 +282,23 @@ impl MonkeySim {
             );
 
             for round_number in 1..=num_rounds {
+                {
+                    let num_monkey_inspections = round
+                        .borrow()
+                        .iter()
+                        .map(|m| {
+                            let m = m.borrow();
+                            let num_inspections = m.num_insepctions;
+                            num_inspections
+                        })
+                        .collect::<Vec<u64>>();
+                    println!("Round #{} = {:?}", round_number, num_monkey_inspections);
+                }
+
                 for monkey in round.borrow().iter() {
                     // Grab the number of inspections about to happen (because the list will get
                     // drained.
-                    let num_inspections = u32::try_from(monkey.borrow().items.borrow().len())?;
+                    let num_inspections = u64::try_from(monkey.borrow().items.borrow().len())?;
 
                     // Inspect each item.
                     for item in monkey.borrow().items.borrow_mut().drain(..) {
@@ -255,9 +310,9 @@ impl MonkeySim {
                         let mut worry_level = operation.execute(item);
 
                         // Alter the worry level since it didn't break...
-                        worry_level = match worry_level_divisor {
-                            None => worry_level,
-                            Some(n) => (f64::from(worry_level) / n).floor() as u32,
+                        worry_level = match worry_manager {
+                            WorryManager::Constant(n) => (worry_level as f64 / n).floor() as u64,
+                            WorryManager::Dynamic => worry_level,
                         };
 
                         // Figure out which monkey will receive this item.
@@ -303,7 +358,7 @@ impl MonkeySim {
 
         num_monkey_inspections.sort_by(|a, b| (b.1).cmp(&a.1));
         let top_monkeys = num_monkey_inspections.iter().take(top_n);
-        let monkey_business_level = top_monkeys.fold(1u32, |product, tuple| product * tuple.1);
+        let monkey_business_level = top_monkeys.fold(1u64, |product, tuple| product * tuple.1);
 
         Ok(monkey_business_level)
     }
@@ -316,13 +371,13 @@ pub struct MonkeyState {
     number: usize,
 
     /// The list of items this monkey has.
-    items: RefCell<Vec<u32>>,
+    items: RefCell<Vec<u64>>,
 
     /// Operation performed to calculate your new worry level.
     operation: Option<Operation>,
 
     /// Test value used to determine which monkey your stuff gets thrown to.
-    test: u32,
+    test: u64,
 
     /// The monkey number that gets your item if the test passes.
     test_pass_monkey_number: usize,
@@ -331,7 +386,7 @@ pub struct MonkeyState {
     test_fail_monkey_number: usize,
 
     /// The number of items this monkey has inspected.
-    num_insepctions: u32,
+    num_insepctions: u64,
 }
 
 /// Represents an operation that calculates your new worry level.
@@ -350,7 +405,7 @@ impl Operation {
     /// # Arguments
     ///
     /// `value` - The value to execute the operation on.
-    pub fn execute(&self, value: u32) -> u32 {
+    pub fn execute(&self, value: u64) -> u64 {
         let get_operands = |first_operand: &Operand, second_operand: &Operand| {
             (
                 match first_operand {
@@ -381,10 +436,20 @@ impl Operation {
 #[derive(Debug, Clone)]
 pub enum Operand {
     /// A constant value.
-    Constant(u32),
+    Constant(u64),
 
     /// The old value.
     OldValue,
+}
+
+/// Worry manager.
+#[derive(Debug)]
+pub enum WorryManager {
+    /// A constant value to divide the worries by.
+    Constant(f64),
+
+    /// My dynamic solution.
+    Dynamic,
 }
 
 /// Part 1
@@ -400,9 +465,31 @@ pub mod part1 {
 
         let monkey_sim = MonkeySim::parse(&input)?;
 
-        let answer = monkey_sim.get_monkey_business_level(20, 2, Some(3.0))?;
+        let answer = monkey_sim.get_monkey_business_level(20, 2, WorryManager::Constant(3.0))?;
 
         println!("Day 11 Solution = {}", answer);
+
+        Ok(())
+    }
+}
+
+/// Part 2
+pub mod part2 {
+    use std::{env::current_dir, fs::read_to_string};
+
+    use super::*;
+
+    /// The solution for Day 11 Part 1
+    pub fn solution() -> Result<(), Error> {
+        tests::get_monkey_business_level_returns_the_correct_answer_after_10000_rounds()?;
+        // let filename = current_dir()?.join("src/data/day11.txt");
+        // let input = read_to_string(filename)?;
+
+        // let monkey_sim = MonkeySim::parse(&input)?;
+
+        // let answer = monkey_sim.get_monkey_business_level(20, 2, WorryManager::Dynamic)?;
+
+        // println!("Day 11 Solution = {}", answer);
 
         Ok(())
     }
