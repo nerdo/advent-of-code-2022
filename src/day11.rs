@@ -380,10 +380,21 @@ pub enum Operand {
 
 /// Part 1
 pub mod part1 {
+    use std::{env::current_dir, fs::read_to_string};
+
     use super::*;
 
     /// The solution for Day 11 Part 1
     pub fn solution() -> Result<(), Error> {
+        let filename = current_dir()?.join("src/data/day11.txt");
+        let input = read_to_string(filename)?;
+
+        let monkey_sim = MonkeySim::parse(&input)?;
+
+        let answer = monkey_sim.get_monkey_business_level(20, 2)?;
+
+        println!("Day 11 Solution = {}", answer);
+
         Ok(())
     }
 }
