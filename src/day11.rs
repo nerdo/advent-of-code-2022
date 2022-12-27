@@ -6,7 +6,7 @@ use std::cell::RefCell;
 
 use anyhow::{bail, Context, Error};
 
-// #[cfg(test)]
+#[cfg(test)]
 mod tests {
     use super::*;
 
@@ -51,9 +51,9 @@ Monkey 3:
         Ok(())
     }
 
-    // #[test]
-    pub fn get_monkey_business_level_returns_the_correct_answer_after_10000_rounds(
-    ) -> Result<(), Error> {
+    #[test]
+    fn get_monkey_business_level_returns_the_correct_answer_after_10000_rounds() -> Result<(), Error>
+    {
         let input = "
 Monkey 0:
   Starting items: 79, 98
@@ -86,7 +86,7 @@ Monkey 3:
 
         let monkey_sim = MonkeySim::parse(input)?;
 
-        let answer = monkey_sim.get_monkey_business_level(20, 2, WorryManager::Dynamic)?;
+        let answer = monkey_sim.get_monkey_business_level(10_000, 2, WorryManager::Dynamic)?;
 
         assert_eq!(answer, 2713310158);
 
@@ -281,39 +281,24 @@ impl MonkeySim {
                     .collect::<Vec<RefCell<MonkeyState>>>(),
             );
 
+            // UGH I was so close to solving this on my own.
+            // It *DID* have to do with primes.
+            // And it *DID* have to do with the prime numbers in the file.
+            // I just didn't put the two together until I started looking for clues online and
+            // watched https://www.youtube.com/watch?v=Aot_ORkkvP4
+            // Mod'ing by the product of divisors should let the numbers "overflow" or (roll over?)
+            // the remainder into the product and keep the properties of the numbers in tact.
+            let product_of_primes = match worry_manager {
+                WorryManager::Dynamic => Some(
+                    self.initial_monkey_states
+                        .iter()
+                        .map(|m| m.test)
+                        .product::<u64>(),
+                ),
+                _ => None,
+            };
+
             for round_number in 1..=num_rounds {
-                // Alter the worry level since it didn't break...
-                let worry_level_divisor = match worry_manager {
-                    WorryManager::Constant(n) => n,
-                    WorryManager::Dynamic => {
-                        1.0
-                        // I think it has to do with prime numbers... All the test divisors
-                        // are prime, so maybe the way to keep it under control (and in
-                        // line with the sample output) is to find the largest prime
-                        // smaller than the round number?
-                        // let mut prime_number = u32::try_from(round_number)?;
-                        // let is_prime = |n| {
-                        //     if n < 2 {
-                        //         return true;
-                        //     }
-                        //     for test in (2..n - 1).rev() {
-                        //         if n % test == 0 {
-                        //             return false;
-                        //         }
-                        //     }
-                        //     true
-                        // };
-
-                        // while !is_prime(prime_number) {
-                        //     prime_number -= 1;
-                        // }
-
-                        // prime_number = prime_number.max(1);
-                        // println!("prime = {}", prime_number);
-                        // f64::try_from(prime_number)?
-                    }
-                };
-
                 for monkey in round.borrow().iter() {
                     // Grab the number of inspections about to happen (because the list will get
                     // drained.
@@ -328,8 +313,15 @@ impl MonkeySim {
                         };
                         let mut worry_level = operation.execute(item);
 
-                        println!("worry level = {}", worry_level);
-                        worry_level = (worry_level as f64 / worry_level_divisor).floor() as u64;
+                        worry_level = match worry_manager {
+                            WorryManager::Constant(n) => (worry_level as f64 / n).floor() as u64,
+                            WorryManager::Dynamic => {
+                                let Some(divisor) = product_of_primes else {
+                                    bail!("No product of primes when worry manager is dynamic!");
+                                };
+                                worry_level % divisor
+                            }
+                        };
 
                         // Figure out which monkey will receive this item.
                         let recipient_monkey_number = if worry_level % monkey.test == 0 {
@@ -355,19 +347,6 @@ impl MonkeySim {
                     }
 
                     monkey.borrow_mut().num_insepctions += num_inspections;
-                }
-
-                {
-                    let num_monkey_inspections = round
-                        .borrow()
-                        .iter()
-                        .map(|m| {
-                            let m = m.borrow();
-                            let num_inspections = m.num_insepctions;
-                            num_inspections
-                        })
-                        .collect::<Vec<u64>>();
-                    println!("Round #{} = {:?}", round_number, num_monkey_inspections);
                 }
             }
 
@@ -496,7 +475,7 @@ pub mod part1 {
 
         let answer = monkey_sim.get_monkey_business_level(20, 2, WorryManager::Constant(3.0))?;
 
-        println!("Day 11 Solution = {}", answer);
+        println!("Day 11 Solution Part 1 = {}", answer);
 
         Ok(())
     }
@@ -510,15 +489,14 @@ pub mod part2 {
 
     /// The solution for Day 11 Part 1
     pub fn solution() -> Result<(), Error> {
-        tests::get_monkey_business_level_returns_the_correct_answer_after_10000_rounds()?;
-        // let filename = current_dir()?.join("src/data/day11.txt");
-        // let input = read_to_string(filename)?;
+        let filename = current_dir()?.join("src/data/day11.txt");
+        let input = read_to_string(filename)?;
 
-        // let monkey_sim = MonkeySim::parse(&input)?;
+        let monkey_sim = MonkeySim::parse(&input)?;
 
-        // let answer = monkey_sim.get_monkey_business_level(20, 2, WorryManager::Dynamic)?;
+        let answer = monkey_sim.get_monkey_business_level(10_000, 2, WorryManager::Dynamic)?;
 
-        // println!("Day 11 Solution = {}", answer);
+        println!("Day 11 Solution Part 2 = {}", answer);
 
         Ok(())
     }
